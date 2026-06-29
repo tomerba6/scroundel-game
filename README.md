@@ -1,0 +1,56 @@
+# Scoundrel
+
+A desktop implementation of **Scoundrel**, a single-player roguelike card game, built in Java with [libGDX](https://libgdx.com/) (LWJGL3 desktop backend).
+
+Scoundrel is a solitaire dungeon crawl played with a trimmed deck of 44 cards. You descend through a "dungeon" of face-up cards, fighting monsters, picking up weapons, and drinking health potions, trying to survive to the bottom of the deck. It's quick, tense, and entirely a game of managing risk with the hand the shuffle deals you.
+
+> **Status:** early scaffolding. The project is a working libGDX skeleton — the rules engine and playable UI are not built yet. Running it today opens an empty window. See [Roadmap](#roadmap) for what's planned.
+
+## How to play
+
+The deck is 44 cards: the 26 clubs and spades are **monsters**, the diamonds 2–10 are **weapons**, and the hearts 2–10 are **potions**. You start with **20 health** (which is also the cap — you can't heal above it).
+
+- **Rooms.** Cards are dealt four at a time from the dungeon. Each set of four is a *room*.
+- **Avoiding.** Instead of fighting, you may scoop up the whole room and put it back at the bottom of the dungeon — but you can't avoid two rooms in a row.
+- **Resolving.** If you don't avoid, you resolve three of the four cards one by one; the fourth carries over into the next room.
+  - **Weapon:** equip it, discarding whatever weapon (and stacked monsters) you had before.
+  - **Potion:** heal by its value, capped at 20. Only the first potion each turn does anything; extras are wasted.
+  - **Monster:** fight it bare-handed (take its full value as damage) or with your weapon (take `monster − weapon`, never below 0).
+- **Weapon degradation.** Once a weapon kills a monster, it can only be used afterward on monsters of **equal or lower value than the last one it slew**. It stays equipped for weaker foes, but tougher monsters must be fought bare-handed.
+- **Winning & losing.** You lose when health hits 0, and win by clearing the entire dungeon. A cleared dungeon scores your remaining health; dying scores a negative number based on the monsters left unfought.
+
+## Build & run
+
+**Prerequisites:** a JDK matching the project's language level (currently Java 21 — see `java.sourceCompatibility` in `build.gradle`). The Gradle wrapper is included, so you don't need a separate Gradle install.
+
+```sh
+# Play the game (desktop launcher)
+./gradlew lwjgl3:run
+
+# Run the rules-engine tests
+./gradlew core:test
+```
+
+On Windows, use `gradlew.bat` instead of `./gradlew`.
+
+## Project structure
+
+This is a Gradle multi-module project. The intended split (per `CLAUDE.md`) is:
+
+- **`core`** — all game logic. The rules engine here is meant to be **pure, headless Java with no libGDX dependency**, so it can be unit-tested without a window or render loop. This is where the model (cards, deck, state), the rules, and the Scene2D screens live.
+- **`lwjgl3`** — a thin desktop launcher (LWJGL3). No game logic.
+
+See [`CLAUDE.md`](CLAUDE.md) for the full design rules and the complete game specification.
+
+## Roadmap
+
+- [ ] Pure model: deck, cards, and game state in `core`
+- [ ] Rules engine: room dealing, avoiding, combat, weapon degradation, scoring
+- [ ] Unit tests covering the tricky rules (degradation, one-potion-per-turn, scoring edge cases)
+- [ ] Scene2D UI to play a full game
+
+## Credits & acknowledgements
+
+Scoundrel was designed by **Zach Gage and Kurt Bieg**.
+
+This repository is an independent, non-commercial fan implementation built for learning. It is **not affiliated with, endorsed by, or sponsored by** the original designers. All credit for the game's design belongs to them.
