@@ -25,6 +25,10 @@ A desktop implementation of **Scoundrel**, a single-player roguelike card game, 
   - `...scoundrel.model` — cards, deck, game state (pure).
   - `...scoundrel.rules` — actions and rule resolution (pure).
   - `...scoundrel.screens` — Scene2D screens (LibGDX-dependent).
+- **Detailed design reference:** the full rules-engine design — the `model`/`rules`
+  types, the turn loop, extension seams, and the locked edge-case decisions — is
+  documented in [`docs/design.md`](docs/design.md) (prose + Mermaid diagrams).
+  Consult it when working on the engine, and keep it in sync when the design changes.
 
 ## Working preferences
 - For any non-trivial change, propose a plan first and wait for review before coding.
@@ -83,3 +87,29 @@ can never heal above 20, except in the one scoring edge case noted below).
 - **If you cleared the Dungeon:** your score is your remaining positive life. Special case:
   if your life is 20 *and* the last card resolved was a health potion, your score is
   20 + that potion's value (the only way the total exceeds 20).
+
+## Extensibility (design the seams, build only base Scoundrel)
+
+This game will later grow achievements, difficulty/variation modes, and new cards
+with special abilities. Design clean extension points for these now, but implement
+ONLY base Scoundrel behind them. Do not build the expansions yet.
+
+- Cards are data-driven. A card references a definition (id, type, value, and an
+  effect that applies itself to the game state). Resolving a card dispatches to its
+  effect — NOT a switch on suit. Build the standard 44-card deck as a default
+  dataset; new cards must be addable as new definitions + effects without changing
+  the core turn loop.
+- All rules and constants live in an injected Ruleset/GameConfig (starting health,
+  room size, cards resolved per turn, health cap, potions per turn, avoid rules,
+  scoring strategy, and the deck definition to use). The engine hardcodes nothing.
+  Variations and difficulty = different Ruleset instances, not new code.
+- The engine stays ignorant of features. apply(move) returns the new state AND the
+  events that occurred (e.g. monster slain, potion wasted, weapon broke, room
+  avoided, game won). Achievements/stats/UI observe these from OUTSIDE core. The
+  core module must never import achievements, persistence, or UI.
+- Keep GameState as plain, serializable records so saves, high scores, and
+  achievements can be persisted later. Don't implement persistence now.
+
+Guardrail: no speculative abstraction. One standard ruleset, the three base card
+effects, no plugin framework. Every extension point must be justified by one of the
+named future features; if it isn't, leave it out.
