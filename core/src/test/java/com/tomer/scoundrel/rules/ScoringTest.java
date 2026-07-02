@@ -1,0 +1,126 @@
+package com.tomer.scoundrel.rules;
+
+import com.tomer.scoundrel.model.GameState;
+import com.tomer.scoundrel.model.Status;
+import com.tomer.scoundrel.rules.Move.FightBarehanded;
+import com.tomer.scoundrel.rules.Move.FightWithWeapon;
+import com.tomer.scoundrel.rules.Move.TakePotion;
+import org.junit.jupiter.api.Test;
+
+import static com.tomer.scoundrel.rules.Cards.monster;
+import static com.tomer.scoundrel.rules.Cards.monster2;
+import static com.tomer.scoundrel.rules.Cards.potion;
+import static com.tomer.scoundrel.rules.Cards.weapon;
+import static com.tomer.scoundrel.rules.StateBuilder.state;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class ScoringTest {
+
+    private final ScoundrelEngine engine = new ScoundrelEngine(Rulesets.standard());
+
+    @Test
+    void reachingZeroHealthLosesImmediately() {
+        GameState s = state().health(5).room(monster2(12), weapon(2), weapon(3), weapon(4)).build();
+        GameState lost = engine.apply(s, new FightBarehanded(monster2(12))).state();
+        assertEquals(Status.LOST, lost.status());
+        assertEquals(-7, lost.health());
+        assertTrue(engine.legalMoves(lost).isEmpty());
+    }
+
+    @Test
+    void lossScoreIsNegativeHealthMinusDungeonMonsters() {
+        // Die at -3 with Q(12) + 9 still face-down: -3 - 21 = -24.
+        GameState s = state().health(4)
+                .room(monster(7), weapon(2), weapon(3), weapon(4))
+                .dungeon(monster(12), monster2(9))
+                .build();
+        GameState lost = engine.apply(s, new FightBarehanded(monster(7))).state();
+        assertEquals(-24, lost.score());
+    }
+
+    @Test
+    void unresolvedRoomMonstersDoNotCountTowardTheLossPenalty() {
+        GameState s = state().health(4)
+                .room(monster(7), monster2(13), monster2(14), potion(2))
+                .dungeon(monster(12), monster2(9))
+                .build();
+        GameState lost = engine.apply(s, new FightBarehanded(monster(7))).state();
+        assertEquals(-24, lost.score()); // K and A in the room are ignored
+    }
+
+    @Test
+    void weaponsAndPotionsInTheDungeonAddNothingToTheLossPenalty() {
+        GameState s = state().health(4)
+                .room(monster(7), weapon(2), weapon(3), weapon(4))
+                .dungeon(weapon(9), potion(8), monster(12))
+                .build();
+        GameState lost = engine.apply(s, new FightBarehanded(monster(7))).state();
+        assertEquals(-3 - 12, lost.score());
+    }
+
+    @Test
+    void clearingEverythingWinsWithRemainingHealthAsScore() {
+        GameState s = state().health(13).room(monster(2)).build();
+        GameState won = engine.apply(s, new FightBarehanded(monster(2))).state();
+        assertEquals(Status.WON, won.status());
+        assertEquals(11, won.score());
+    }
+
+    @Test
+    void winningAtExactly20WithAPotionLastScores20PlusItsValue() {
+        GameState s = state().health(16).room(potion(4)).build();
+        GameState won = engine.apply(s, new TakePotion(potion(4))).state();
+        assertEquals(20, won.health());
+        assertEquals(24, won.score());
+    }
+
+    @Test
+    void winningAt20WithAMonsterLastScoresJust20() {
+        GameState s = state().health(20).room(monster(3)).weapon(weapon(10)).build();
+        GameState won = engine.apply(s, new FightWithWeapon(monster(3))).state();
+        assertEquals(20, won.health());
+        assertEquals(20, won.score());
+    }
+
+    @Test
+    void winningBelow20WithAPotionLastGetsNoBonus() {
+        GameState s = state().health(15).room(potion(4)).build();
+        GameState won = engine.apply(s, new TakePotion(potion(4))).state();
+        assertEquals(19, won.score());
+    }
+
+    @Test
+    void capWastedFinalPotionStillTriggersTheBonus() {
+        GameState s = state().health(20).room(potion(9)).build();
+        GameState won = engine.apply(s, new TakePotion(potion(9))).state();
+        assertEquals(20, won.health());
+        assertEquals(29, won.score());
+    }
+
+    @Test
+    void dyingOnTheVeryLastCardIsALoss() {
+        GameState s = state().health(3).room(monster(5)).build();
+        GameState lost = engine.apply(s, new FightBarehanded(monster(5))).state();
+        assertEquals(Status.LOST, lost.status());
+        assertEquals(-2, lost.score()); // empty dungeon adds no penalty
+    }
+
+    @Test
+    void noMovesAreLegalAfterTheGameEnds() {
+        GameState won = engine.apply(
+                state().health(13).room(monster(2)).build(),
+                new FightBarehanded(monster(2))).state();
+        assertTrue(engine.legalMoves(won).isEmpty());
+        assertThrows(IllegalMoveException.class,
+                () -> engine.apply(won, new FightBarehanded(monster(3))));
+
+        GameState lost = engine.apply(
+                state().health(3).room(monster(5)).build(),
+                new FightBarehanded(monster(5))).state();
+        assertTrue(engine.legalMoves(lost).isEmpty());
+        assertThrows(IllegalMoveException.class,
+                () -> engine.apply(lost, new Move.AvoidRoom()));
+    }
+}

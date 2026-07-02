@@ -61,7 +61,7 @@ ruleset's deck at the moment of resolution.
 **The equipped weapon and degradation.** `EquippedWeapon(Card weapon,
 List<Card> slain)` keeps the weapon plus the stack of monsters it has slain,
 most-recent last. Its degradation state is derived: `threshold()` is the value of
-the last slain monster (or "no limit" if it has slain nothing), and
+the last slain monster (an `OptionalInt`, empty — no limit — while nothing is slain), and
 `canUseAgainst(monster)` is true when the weapon has slain nothing yet or
 `monster.value < threshold`. Keeping the whole stack (not just the last value)
 preserves the "discard the weapon and its stacked monsters when replaced" wording
@@ -296,7 +296,7 @@ classDiagram
     class EquippedWeapon {
         +Card weapon
         +List~Card~ slain
-        +threshold() int
+        +threshold() OptionalInt
         +canUseAgainst(Card) boolean
     }
 
