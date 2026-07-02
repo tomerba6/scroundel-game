@@ -62,7 +62,7 @@ class EngineContractTest {
                 .room(potion(7), weapon(2), weapon(3), weapon(4))
                 .dungeon(monster(2)).build();
         GameState snapshot = new GameState(s.dungeon(), s.room(), s.weapon(), s.health(),
-                s.potionsUsedThisRoom(), s.roomResolutionStarted(), s.previousRoomAvoided(),
+                s.potionsUsedThisRoom(), s.cardsResolvedThisTurn(), s.previousRoomAvoided(),
                 s.lastResolvedCard(), s.status(), s.score());
         engine.apply(s, new TakePotion(potion(7)));
         assertEquals(snapshot, s);

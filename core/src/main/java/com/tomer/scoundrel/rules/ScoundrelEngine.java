@@ -41,7 +41,7 @@ public final class ScoundrelEngine {
         List<Card> room = new ArrayList<>();
         refill(room, dungeon);
         return new GameState(dungeon, room, null, rules.startingHealth(), 0,
-                false, false, null, Status.IN_PROGRESS, null);
+                0, false, null, Status.IN_PROGRESS, null);
     }
 
     public List<Move> legalMoves(GameState state) {
@@ -74,7 +74,7 @@ public final class ScoundrelEngine {
         List<Card> room = new ArrayList<>();
         refill(room, dungeon);
         GameState next = new GameState(dungeon, room, state.weapon(), state.health(), 0,
-                false, true, state.lastResolvedCard(), Status.IN_PROGRESS, null);
+                0, true, state.lastResolvedCard(), Status.IN_PROGRESS, null);
         List<GameEvent> events = List.of(
                 new GameEvent.RoomAvoided(state.room()),
                 new GameEvent.RoomDealt(room));
@@ -92,21 +92,23 @@ public final class ScoundrelEngine {
         int health = ctx.health();
         EquippedWeapon weapon = ctx.weapon();
         int potionsUsed = ctx.potionsUsedThisRoom();
-        boolean started = true;
+        int resolvedThisTurn = state.cardsResolvedThisTurn() + 1;
         boolean previousAvoided = state.previousRoomAvoided();
         List<GameEvent> events = new ArrayList<>(ctx.events());
 
         if (health <= 0) {
             // Loss freezes the state as-is: no refill, raw (negative) health kept.
             return terminal(new GameState(dungeon, room, weapon, health, potionsUsed,
-                    started, previousAvoided, card, Status.LOST, null), events);
+                    resolvedThisTurn, previousAvoided, card, Status.LOST, null), events);
         }
 
-        if (room.size() <= rules.roomSize() - rules.cardsResolvedPerTurn()) {
-            // Turn over: the leftover card carries into the next room.
+        if (resolvedThisTurn >= rules.cardsResolvedPerTurn() || room.isEmpty()) {
+            // Turn over: the leftover card (if any) carries into the next room.
+            // A room that started partial ends only when it empties, so its
+            // cards share one turn (and one potion allowance).
             refill(room, dungeon);
             potionsUsed = 0;
-            started = false;
+            resolvedThisTurn = 0;
             previousAvoided = false;
             if (!room.isEmpty()) {
                 events.add(new GameEvent.RoomDealt(List.copyOf(room)));
@@ -115,11 +117,11 @@ public final class ScoundrelEngine {
 
         if (room.isEmpty() && dungeon.isEmpty()) {
             return terminal(new GameState(dungeon, room, weapon, health, potionsUsed,
-                    started, previousAvoided, card, Status.WON, null), events);
+                    resolvedThisTurn, previousAvoided, card, Status.WON, null), events);
         }
 
         GameState next = new GameState(dungeon, room, weapon, health, potionsUsed,
-                started, previousAvoided, card, Status.IN_PROGRESS, null);
+                resolvedThisTurn, previousAvoided, card, Status.IN_PROGRESS, null);
         return new MoveResult(next, events);
     }
 
@@ -127,7 +129,7 @@ public final class ScoundrelEngine {
         int score = rules.scoring().score(unscored, rules);
         GameState scored = new GameState(unscored.dungeon(), unscored.room(),
                 unscored.weapon(), unscored.health(), unscored.potionsUsedThisRoom(),
-                unscored.roomResolutionStarted(), unscored.previousRoomAvoided(),
+                unscored.cardsResolvedThisTurn(), unscored.previousRoomAvoided(),
                 unscored.lastResolvedCard(), unscored.status(), score);
         events.add(unscored.status() == Status.WON
                 ? new GameEvent.GameWon(score)

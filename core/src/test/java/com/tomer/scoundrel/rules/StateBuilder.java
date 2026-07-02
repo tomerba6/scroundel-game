@@ -15,7 +15,7 @@ final class StateBuilder {
     private EquippedWeapon weapon;
     private int health = 20;
     private int potionsUsed = 0;
-    private boolean started = false;
+    private int cardsResolved = 0;
     private boolean previousAvoided = false;
     private Card lastResolved;
 
@@ -54,7 +54,7 @@ final class StateBuilder {
     }
 
     StateBuilder started() {
-        this.started = true;
+        this.cardsResolved = 1;
         return this;
     }
 
@@ -65,6 +65,6 @@ final class StateBuilder {
 
     GameState build() {
         return new GameState(dungeon, room, weapon, health, potionsUsed,
-                started, previousAvoided, lastResolved, Status.IN_PROGRESS, null);
+                cardsResolved, previousAvoided, lastResolved, Status.IN_PROGRESS, null);
     }
 }

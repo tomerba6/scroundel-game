@@ -75,7 +75,7 @@ to describe and continue a game:
 - `weapon: EquippedWeapon` — null when nothing is equipped.
 - `health: int` — starts at `startingHealth`, capped at `healthCap`, may reach 0 or below.
 - `potionsUsedThisRoom: int` — potions taken this turn; compared against the ruleset's `potionsPerTurn` (an int so a variant ruleset can allow more than one heal).
-- `roomResolutionStarted: boolean` — true once any card in the current room has been resolved; gates avoiding.
+- `cardsResolvedThisTurn: int` — cards resolved so far this turn; the turn ends when it reaches the ruleset's `cardsResolvedPerTurn` (or the room empties). The derived `roomResolutionStarted()` (`> 0`) gates avoiding.
 - `previousRoomAvoided: boolean` — true if the immediately preceding room was avoided; enforces "never two in a row."
 - `lastResolvedCard: Card` — the most recently resolved card; drives the 20-and-a-potion scoring case.
 - `status: Status` — `IN_PROGRESS`, `WON`, or `LOST`.
@@ -122,8 +122,8 @@ and emits semantic events. The engine then runs a fixed post-resolution step.
 
 **Dealing and rooms.** A room is filled by flipping from the top of the dungeon
 until it holds `roomSize` cards (or until the dungeon is empty). Dealing a fresh
-room starts a new turn: `potionUsedThisRoom` and `roomResolutionStarted` reset to
-false.
+room starts a new turn: `potionsUsedThisRoom` and `cardsResolvedThisTurn` reset
+to 0.
 
 **Combat.** Barehanded, the monster's full value is subtracted from health and the
 monster is discarded. With a weapon, damage taken is
@@ -143,11 +143,14 @@ taken this room heals by its value, capped at `healthCap`, and increments
 `potionsUsedThisRoom`. Any further potion that turn is discarded and does nothing.
 A potion that heals 0 because health is already at the cap still counts as taken.
 
-**Carryover and refill.** If you don't avoid, you resolve cards one at a time.
-After three of the four are resolved the room has one card left: that card carries
-over as the first card of the next room, then the room refills from the dungeon
-back up to `roomSize`, beginning a new turn. This carryover/refill happens only
-while the dungeon still has cards.
+**Carryover and refill.** If you don't avoid, you resolve cards one at a time. A
+turn ends when `cardsResolvedPerTurn` cards have been resolved **or the room
+empties**, whichever comes first. In a full room that means three of the four:
+the leftover card carries over as the first card of the next room, then the room
+refills from the dungeon back up to `roomSize`, beginning a new turn (fresh
+potion allowance). A room that *starts* partial (possible only once the dungeon
+is empty) therefore plays out as a single turn — its two or three cards share
+one potion allowance.
 
 **Avoiding.** Avoiding scoops the whole room to the bottom of the dungeon and deals
 a fresh room. It is legal only when the room has not been started (no card resolved
@@ -230,7 +233,7 @@ The design opens exactly the seams the named future features require, and no mor
 2. **Loss penalty** counts monsters in the **face-down dungeon only**; unresolved face-up room cards are excluded.
 3. **20-and-a-potion:** clearing the dungeon at exactly the health cap with the last resolved card being a potion scores `cap + potion value`, even if that heal was wasted.
 4. **Weapon degradation** uses strict `<` (a monster of equal value must be fought barehanded); a weapon that can't be used on a given monster stays equipped for weaker ones and is never discarded by degradation.
-5. **Partial rooms:** when the dungeon runs low, rooms fill with whatever remains and there is no carryover; all remaining cards are resolved, and clearing them with health > 0 is the win.
+5. **Partial rooms:** when the dungeon runs low, rooms fill with whatever remains and there is no carryover; all remaining cards are resolved, and clearing them with health > 0 is the win. **Turn boundaries at the end:** a turn ends after `cardsResolvedPerTurn` resolutions *or when the room empties* — so a room that starts partial is one turn (one potion allowance; the standard deck's arithmetic makes every completed game end in a 2-card room), while the lone carryover left after a full room is still its own next room/turn.
 6. **Avoiding requires a non-empty dungeon.** With an empty dungeon (partial room, or a full room dealt from the last cards), avoiding would re-deal the exact same cards — a guaranteed no-op — so it is illegal. Equivalently: every legal avoid actually changes the room.
 
 ### Deferred seams and tradeoffs
@@ -307,7 +310,7 @@ classDiagram
         +EquippedWeapon weapon
         +int health
         +int potionsUsedThisRoom
-        +boolean roomResolutionStarted
+        +int cardsResolvedThisTurn
         +boolean previousRoomAvoided
         +Card lastResolvedCard
         +Status status
@@ -445,7 +448,7 @@ stateDiagram-v2
 
     DealRoom : Deal Room
     DealRoom : flip Dungeon until roomSize face-up (or Dungeon empty)
-    DealRoom : start of turn — potionsUsedThisRoom=0, roomResolutionStarted=false
+    DealRoom : start of turn — potionsUsedThisRoom=0, cardsResolvedThisTurn=0
     DealRoom --> Room
 
     Room : Room — up to roomSize face-up cards
@@ -466,7 +469,7 @@ stateDiagram-v2
     Resolve : equip weapon / drink potion / fight monster
     Resolve --> Lost : health <= 0
     Resolve --> Won : Room empty AND Dungeon empty
-    Resolve --> DealRoom : 3 of 4 resolved, Dungeon not empty
+    Resolve --> DealRoom : turn over (cardsResolvedPerTurn reached or room empty), cards remain
     Resolve --> Room : cards remain (avoid now blocked)
 
     note left of Resolve
@@ -474,8 +477,11 @@ stateDiagram-v2
       over as the first card of the next room,
       then the room refills to roomSize.
       Near the end the Dungeon empties: rooms become
-      partial and every remaining card is resolved.
-      Resolving any card sets roomResolutionStarted=true.
+      partial, every remaining card is resolved, and
+      a room that starts partial is a SINGLE turn
+      (one potion allowance) because the turn only
+      ends at 3 resolutions or an empty room.
+      Each resolution increments cardsResolvedThisTurn.
     end note
 
     Won : WON

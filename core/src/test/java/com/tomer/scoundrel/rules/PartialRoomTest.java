@@ -74,6 +74,21 @@ class PartialRoomTest {
     }
 
     @Test
+    void aRoomThatStartsPartialIsASingleTurnWithOnePotionAllowance() {
+        // The standard deck's arithmetic makes every completed game end in a
+        // 2-card room; both cards share one turn, so the second potion is wasted.
+        GameState s = state().health(10).room(potion(5), potion(9)).build();
+        GameState mid = engine.apply(s, new TakePotion(potion(5))).state();
+        assertEquals(15, mid.health());
+        assertEquals(1, mid.potionsUsedThisRoom()); // no reset between the two cards
+        MoveResult last = engine.apply(mid, new TakePotion(potion(9)));
+        assertTrue(last.events().contains(new GameEvent.PotionWasted(potion(9))));
+        assertEquals(15, last.state().health());
+        assertEquals(Status.WON, last.state().status());
+        assertEquals(15, last.state().score()); // health != 20, so no potion bonus
+    }
+
+    @Test
     void avoidingAPartialRoomIsIllegal() {
         GameState s = state().room(potion(2), potion(3), potion(4)).build(); // dungeon empty
         assertFalse(engine.legalMoves(s).contains(new AvoidRoom()));

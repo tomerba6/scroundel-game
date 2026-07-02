@@ -14,7 +14,7 @@ public record GameState(
         EquippedWeapon weapon,
         int health,
         int potionsUsedThisRoom,
-        boolean roomResolutionStarted,
+        int cardsResolvedThisTurn,
         boolean previousRoomAvoided,
         Card lastResolvedCard,
         Status status,
@@ -23,5 +23,10 @@ public record GameState(
     public GameState {
         dungeon = List.copyOf(dungeon);
         room = List.copyOf(room);
+    }
+
+    /** True once any card in the current room has been resolved; gates avoiding. */
+    public boolean roomResolutionStarted() {
+        return cardsResolvedThisTurn > 0;
     }
 }

@@ -115,10 +115,13 @@ class RoomFlowTest {
                 weapon(2), weapon(3), weapon(4)));
         g = engine.apply(g, new TakePotion(potion(2))).state();
         assertEquals(1, g.potionsUsedThisRoom());
+        assertEquals(1, g.cardsResolvedThisTurn());
         assertTrue(g.roomResolutionStarted());
         g = engine.apply(g, new Move.FightBarehanded(monster(2))).state();
+        assertEquals(2, g.cardsResolvedThisTurn());
         g = engine.apply(g, new Move.FightBarehanded(monster(3))).state(); // turn over
         assertEquals(0, g.potionsUsedThisRoom());
+        assertEquals(0, g.cardsResolvedThisTurn());
         assertFalse(g.roomResolutionStarted());
         assertEquals(4, g.room().size());
     }
