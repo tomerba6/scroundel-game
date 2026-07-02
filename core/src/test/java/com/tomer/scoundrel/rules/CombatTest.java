@@ -1,6 +1,5 @@
 package com.tomer.scoundrel.rules;
 
-import com.tomer.scoundrel.model.Card;
 import com.tomer.scoundrel.model.GameState;
 import com.tomer.scoundrel.rules.Move.FightBarehanded;
 import com.tomer.scoundrel.rules.Move.FightWithWeapon;
@@ -11,6 +10,7 @@ import java.util.List;
 
 import static com.tomer.scoundrel.rules.Cards.monster;
 import static com.tomer.scoundrel.rules.Cards.weapon;
+import static com.tomer.scoundrel.rules.Moves.movesFor;
 import static com.tomer.scoundrel.rules.StateBuilder.state;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -21,13 +21,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CombatTest {
 
     private final ScoundrelEngine engine = new ScoundrelEngine(Rulesets.standard());
-
-    /** Moves the engine offers for one specific room card. */
-    static List<Move> movesFor(ScoundrelEngine engine, GameState state, Card card) {
-        return engine.legalMoves(state).stream()
-                .filter(m -> m instanceof Move.CardMove cm && cm.targetCard().equals(card))
-                .toList();
-    }
 
     @Test
     void barehandedFightSubtractsFullMonsterValue() {

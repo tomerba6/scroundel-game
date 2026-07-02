@@ -10,7 +10,7 @@ import java.util.List;
 import static com.tomer.scoundrel.rules.Cards.monster;
 import static com.tomer.scoundrel.rules.Cards.monster2;
 import static com.tomer.scoundrel.rules.Cards.weapon;
-import static com.tomer.scoundrel.rules.CombatTest.movesFor;
+import static com.tomer.scoundrel.rules.Moves.movesFor;
 import static com.tomer.scoundrel.rules.StateBuilder.state;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

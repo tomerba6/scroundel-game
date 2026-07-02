@@ -11,7 +11,7 @@ import java.util.List;
 import static com.tomer.scoundrel.rules.Cards.monster;
 import static com.tomer.scoundrel.rules.Cards.potion;
 import static com.tomer.scoundrel.rules.Cards.weapon;
-import static com.tomer.scoundrel.rules.CombatTest.movesFor;
+import static com.tomer.scoundrel.rules.Moves.movesFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;

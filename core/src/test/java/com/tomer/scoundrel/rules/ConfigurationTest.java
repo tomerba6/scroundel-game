@@ -12,6 +12,7 @@ import java.util.List;
 import static com.tomer.scoundrel.rules.Cards.potion;
 import static com.tomer.scoundrel.rules.Cards.weapon;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Determinism plus the extension seams: constants come from the Ruleset, and a
@@ -60,6 +61,23 @@ class ConfigurationTest {
         assertEquals(12, g.health());
         GameState next = engine.apply(g, new TakePotion(potion(9))).state();
         assertEquals(15, next.health()); // 12 + 9 clipped to cap 15
+    }
+
+    @Test
+    void potionsPerTurnAboveOneIsHonored() {
+        Ruleset standard = Rulesets.standard();
+        Ruleset generous = new Ruleset(5, 20, 4, 3, 2,
+                standard.avoidRule(), standard.scoring(), standard.deck());
+        ScoundrelEngine engine = new ScoundrelEngine(generous);
+        GameState g = engine.newGame(List.of(
+                potion(3), potion(4), potion(5), weapon(2), weapon(3)));
+        g = engine.apply(g, new TakePotion(potion(3))).state();
+        assertEquals(8, g.health());
+        g = engine.apply(g, new TakePotion(potion(4))).state();
+        assertEquals(12, g.health()); // second potion of the turn heals too
+        MoveResult third = engine.apply(g, new TakePotion(potion(5)));
+        assertEquals(12, third.state().health()); // third exceeds the allowance
+        assertTrue(third.events().contains(new GameEvent.PotionWasted(potion(5))));
     }
 
     @Test
