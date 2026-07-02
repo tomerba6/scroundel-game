@@ -75,10 +75,11 @@ can never heal above 20, except in the one scoring edge case noted below).
 - **With a weapon:** damage taken = max(0, monster value − weapon value). (Weapon 5 vs a 3
   monster → 0 damage; weapon 5 vs a Jack(11) → 6 damage.) Stack the monster on the weapon.
 - **Weapon degradation (IMPORTANT):** once a weapon has slain a monster, it can only be used
-  on monsters whose value is **less than or equal to the last monster it slew**. Example: a
-  5-weapon that killed a Queen(12) can still be used on a 6 (6 ≤ 12); but after it is used on
-  a 6, it can only be used on monsters ≤ 6 — a Queen would have to be fought barehanded. The
-  weapon is **not** discarded when it can't be used; it stays equipped for weaker monsters.
+  on monsters whose value is **strictly less than the last monster it slew**. Example: a
+  5-weapon that killed a Queen(12) can still be used on a 6 (6 < 12); but after it is used on
+  a 6, it can only be used on monsters of value 5 or lower — another 6, or a Queen, would
+  have to be fought barehanded. The weapon is **not** discarded when it can't be used; it
+  stays equipped for weaker monsters.
 
 ### End and scoring
 - The game ends when health reaches 0, or you clear the entire Dungeon.

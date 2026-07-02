@@ -16,7 +16,7 @@ The deck is 44 cards: the 26 clubs and spades are **monsters**, the diamonds 2â€
   - **Weapon:** equip it, discarding whatever weapon (and stacked monsters) you had before.
   - **Potion:** heal by its value, capped at 20. Only the first potion each turn does anything; extras are wasted.
   - **Monster:** fight it bare-handed (take its full value as damage) or with your weapon (take `monster âˆ’ weapon`, never below 0).
-- **Weapon degradation.** Once a weapon kills a monster, it can only be used afterward on monsters of **equal or lower value than the last one it slew**. It stays equipped for weaker foes, but tougher monsters must be fought bare-handed.
+- **Weapon degradation.** Once a weapon kills a monster, it can only be used afterward on monsters **strictly weaker than the last one it slew**. It stays equipped for weaker foes, but equal or tougher monsters must be fought bare-handed.
 - **Winning & losing.** You lose when health hits 0, and win by clearing the entire dungeon. A cleared dungeon scores your remaining health; dying scores a negative number based on the monsters left unfought.
 
 ## Build & run

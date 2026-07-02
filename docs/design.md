@@ -63,7 +63,7 @@ List<Card> slain)` keeps the weapon plus the stack of monsters it has slain,
 most-recent last. Its degradation state is derived: `threshold()` is the value of
 the last slain monster (or "no limit" if it has slain nothing), and
 `canUseAgainst(monster)` is true when the weapon has slain nothing yet or
-`monster.value <= threshold`. Keeping the whole stack (not just the last value)
+`monster.value < threshold`. Keeping the whole stack (not just the last value)
 preserves the "discard the weapon and its stacked monsters when replaced" wording
 and is useful to the UI; the rules read only the last element.
 
@@ -74,7 +74,7 @@ to describe and continue a game:
 - `room: List<Card>` — the up-to-`roomSize` face-up cards.
 - `weapon: EquippedWeapon` — null when nothing is equipped.
 - `health: int` — starts at `startingHealth`, capped at `healthCap`, may reach 0 or below.
-- `potionUsedThisRoom: boolean` — enforces one heal per turn.
+- `potionsUsedThisRoom: int` — potions taken this turn; compared against the ruleset's `potionsPerTurn` (an int so a variant ruleset can allow more than one heal).
 - `roomResolutionStarted: boolean` — true once any card in the current room has been resolved; gates avoiding.
 - `previousRoomAvoided: boolean` — true if the immediately preceding room was avoided; enforces "never two in a row."
 - `lastResolvedCard: Card` — the most recently resolved card; drives the 20-and-a-potion scoring case.
@@ -129,16 +129,19 @@ false.
 monster is discarded. With a weapon, damage taken is
 `max(0, monsterValue − weaponValue)` and the monster is stacked on the weapon.
 **Degradation:** once a weapon has slain a monster it may only be used on monsters
-whose value is **≤** the last monster it slew (equal is allowed); each use lowers
-the threshold to the just-slain monster's value. A monster above the threshold
-simply can't be fought with the weapon — `legalMoves` won't offer `FightWithWeapon`
-for it — but the weapon **stays equipped** for weaker monsters and is never
-discarded by degradation. Degradation is focused combat logic in the core (not yet
+whose value is **strictly less than** (`<`) the last monster it slew — an equal
+value is NOT allowed; each use lowers the threshold to the just-slain monster's
+value. A monster at or above the threshold simply can't be fought with the weapon —
+`legalMoves` won't offer `FightWithWeapon` for it — but the weapon **stays
+equipped** for weaker monsters and is never discarded by degradation. A consequence
+of the strict comparison: a weapon that slays a 2 (the lowest monster value) can
+never be used again, though it remains equipped. Degradation is focused combat logic in the core (not yet
 an injected policy).
 
-**Potions.** The first potion resolved in a room heals by its value, capped at
-`healthCap`, and sets `potionUsedThisRoom`. Any further potion that turn is
-discarded and does nothing.
+**Potions.** A potion resolved while fewer than `potionsPerTurn` potions have been
+taken this room heals by its value, capped at `healthCap`, and increments
+`potionsUsedThisRoom`. Any further potion that turn is discarded and does nothing.
+A potion that heals 0 because health is already at the cap still counts as taken.
 
 **Carryover and refill.** If you don't avoid, you resolve cards one at a time.
 After three of the four are resolved the room has one card left: that card carries
@@ -148,10 +151,14 @@ while the dungeon still has cards.
 
 **Avoiding.** Avoiding scoops the whole room to the bottom of the dungeon and deals
 a fresh room. It is legal only when the room has not been started (no card resolved
-yet) and the previous room was not avoided — you may avoid any number of rooms but
-never two in a row. Avoiding sets `previousRoomAvoided` so the next room cannot be
-avoided; resolving a card instead leaves that flag false, so the following room may
-be avoided again.
+yet), the previous room was not avoided — you may avoid any number of rooms but
+never two in a row — and the dungeon is **not empty**. The last guard exists because
+a partial room can only occur once the dungeon is empty, and avoiding then would be
+a guaranteed no-op: the scooped cards would be re-dealt unchanged. Rather than offer
+a move that provably does nothing (and pollutes avoid stats), `StandardAvoidRule`
+rejects it. Avoiding sets `previousRoomAvoided` so the next room cannot be avoided;
+resolving a card instead leaves that flag false, so the following room may be
+avoided again.
 
 **Ending and partial rooms.** Near the end the dungeon empties; rooms then become
 partial (1–3 cards) and there is no further carryover — every remaining card is
@@ -222,8 +229,9 @@ The design opens exactly the seams the named future features require, and no mor
 1. **Avoiding** is allowed only before any card in the room has been resolved (and never two rooms in a row).
 2. **Loss penalty** counts monsters in the **face-down dungeon only**; unresolved face-up room cards are excluded.
 3. **20-and-a-potion:** clearing the dungeon at exactly the health cap with the last resolved card being a potion scores `cap + potion value`, even if that heal was wasted.
-4. **Weapon degradation** uses `≤` (equal allowed); a weapon that can't be used on a given monster stays equipped for weaker ones and is never discarded by degradation.
+4. **Weapon degradation** uses strict `<` (a monster of equal value must be fought barehanded); a weapon that can't be used on a given monster stays equipped for weaker ones and is never discarded by degradation.
 5. **Partial rooms:** when the dungeon runs low, rooms fill with whatever remains and there is no carryover; all remaining cards are resolved, and clearing them with health > 0 is the win.
+6. **Avoiding requires a non-empty dungeon.** With an empty dungeon (partial room, or a full room dealt from the last cards), avoiding would re-deal the exact same cards — a guaranteed no-op — so it is illegal. Equivalently: every legal avoid actually changes the room.
 
 ### Deferred seams and tradeoffs
 
@@ -298,7 +306,7 @@ classDiagram
         +List~Card~ room
         +EquippedWeapon weapon
         +int health
-        +boolean potionUsedThisRoom
+        +int potionsUsedThisRoom
         +boolean roomResolutionStarted
         +boolean previousRoomAvoided
         +Card lastResolvedCard
@@ -323,7 +331,7 @@ classDiagram
     %% --- injected rules/config ---
     class Ruleset {
         +int startingHealth
-        +int healthCap
+        +int healthCap  
         +int roomSize
         +int cardsResolvedPerTurn
         +int potionsPerTurn
@@ -437,7 +445,7 @@ stateDiagram-v2
 
     DealRoom : Deal Room
     DealRoom : flip Dungeon until roomSize face-up (or Dungeon empty)
-    DealRoom : start of turn — potionUsedThisRoom=false, roomResolutionStarted=false
+    DealRoom : start of turn — potionsUsedThisRoom=0, roomResolutionStarted=false
     DealRoom --> Room
 
     Room : Room — up to roomSize face-up cards
@@ -447,7 +455,8 @@ stateDiagram-v2
     note right of Room
       Avoid is legal ONLY when the previous
       room was NOT avoided AND no card has been
-      resolved in this room yet.
+      resolved in this room yet AND the Dungeon
+      is not empty (else it would be a no-op).
       Avoid scoops the room to the bottom of the
       Dungeon and sets previousRoomAvoided=true,
       so the next room cannot be avoided.
