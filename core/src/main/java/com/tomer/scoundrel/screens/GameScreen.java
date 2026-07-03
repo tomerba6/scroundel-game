@@ -3,13 +3,18 @@ package com.tomer.scoundrel.screens;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.Group;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.tomer.scoundrel.model.Card;
@@ -17,10 +22,12 @@ import com.tomer.scoundrel.model.CardType;
 import com.tomer.scoundrel.model.EquippedWeapon;
 import com.tomer.scoundrel.model.GameState;
 import com.tomer.scoundrel.rules.Move;
+import com.tomer.scoundrel.rules.MoveResult;
 import com.tomer.scoundrel.rules.Ruleset;
 import com.tomer.scoundrel.rules.Rulesets;
 import com.tomer.scoundrel.rules.ScoundrelEngine;
 
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -140,15 +147,26 @@ public final class GameScreen extends ScreenAdapter {
     }
 
     private Actor avoidButton() {
+        TextButton button = torchButton("Avoid");
+        button.setDisabled(!engine.legalMoves(state).contains(new Move.AvoidRoom()));
+        button.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                applyMove(new Move.AvoidRoom());
+            }
+        });
+        return button;
+    }
+
+    private TextButton torchButton(String text) {
         TextButton.TextButtonStyle style = new TextButton.TextButtonStyle();
         style.font = theme.bodyBold;
         style.up = theme.solid(Theme.TORCHLIGHT);
         style.fontColor = Theme.SOOT;
         style.disabled = theme.solid(Theme.STONE);
         style.disabledFontColor = dim(Theme.BONE, 0.35f);
-        TextButton button = new TextButton("Avoid", style);
+        TextButton button = new TextButton(text, style);
         button.pad(6, 20, 6, 20);
-        button.setDisabled(!engine.legalMoves(state).contains(new Move.AvoidRoom()));
         return button;
     }
 
@@ -172,7 +190,78 @@ public final class GameScreen extends ScreenAdapter {
         tile.add(label(String.valueOf(card.value()), theme.display, text)).expand();
         tile.row();
         tile.add(cardCorner(card, text)).right().padRight(12).padBottom(10);
+        tile.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                onCardClicked(card, tile);
+            }
+        });
         return tile;
+    }
+
+    /** One legal move plays immediately; two or more open the chooser. */
+    private void onCardClicked(Card card, Actor tile) {
+        List<Move> moves = engine.legalMoves(state).stream()
+                .filter(m -> m instanceof Move.CardMove cm && cm.targetCard().equals(card))
+                .toList();
+        if (moves.size() == 1) {
+            applyMove(moves.get(0));
+        } else if (moves.size() > 1) {
+            showChooser(moves, tile);
+        }
+    }
+
+    /** Small button stack over the clicked card; clicking elsewhere dismisses. */
+    private void showChooser(List<Move> moves, Actor tile) {
+        Group overlay = new Group();
+        Actor catcher = new Actor();
+        catcher.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+        catcher.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                overlay.remove();
+            }
+        });
+        overlay.addActor(catcher);
+
+        Table popup = new Table();
+        popup.setBackground(theme.solid(Theme.STONE));
+        popup.pad(8);
+        popup.defaults().growX().space(6);
+        for (Move move : moves) {
+            TextButton button = torchButton(moveLabel(move));
+            button.addListener(new ChangeListener() {
+                @Override
+                public void changed(ChangeEvent event, Actor actor) {
+                    overlay.remove();
+                    applyMove(move);
+                }
+            });
+            popup.add(button);
+            popup.row();
+        }
+        popup.pack();
+        Vector2 center = tile.localToStageCoordinates(
+                new Vector2(tile.getWidth() / 2f, tile.getHeight() / 2f));
+        popup.setPosition(center.x - popup.getWidth() / 2f, center.y - popup.getHeight() / 2f);
+        overlay.addActor(popup);
+        stage.addActor(overlay);
+    }
+
+    private static String moveLabel(Move move) {
+        return switch (move) {
+            case Move.FightWithWeapon ignored -> "Use weapon";
+            case Move.FightBarehanded ignored -> "Barehanded";
+            case Move.TakeWeapon ignored -> "Equip";
+            case Move.TakePotion ignored -> "Drink";
+            case Move.AvoidRoom ignored -> "Avoid";
+        };
+    }
+
+    private void applyMove(Move move) {
+        MoveResult result = engine.apply(state, move);
+        state = result.state();
+        rebuild();
     }
 
     /** Rank + suit identity, bottom-right like a playing card index. */
