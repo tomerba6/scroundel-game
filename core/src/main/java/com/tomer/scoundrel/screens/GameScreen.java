@@ -8,11 +8,14 @@ import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Group;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.ui.VerticalGroup;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.ScreenUtils;
@@ -21,6 +24,7 @@ import com.tomer.scoundrel.model.Card;
 import com.tomer.scoundrel.model.CardType;
 import com.tomer.scoundrel.model.EquippedWeapon;
 import com.tomer.scoundrel.model.GameState;
+import com.tomer.scoundrel.rules.GameEvent;
 import com.tomer.scoundrel.rules.Move;
 import com.tomer.scoundrel.rules.MoveResult;
 import com.tomer.scoundrel.rules.Ruleset;
@@ -45,6 +49,8 @@ public final class GameScreen extends ScreenAdapter {
     private final Ruleset rules;
     private final ScoundrelEngine engine;
     private final Stage stage;
+    private final Table root = new Table();
+    private final VerticalGroup feed = new VerticalGroup();
     private GameState state;
 
     public GameScreen(Theme theme) {
@@ -53,6 +59,21 @@ public final class GameScreen extends ScreenAdapter {
         this.engine = new ScoundrelEngine(rules);
         this.stage = new Stage(new FitViewport(WORLD_WIDTH, WORLD_HEIGHT));
         this.state = engine.newGame(new Random().nextLong());
+
+        root.setFillParent(true);
+        stage.addActor(root);
+
+        // The fading feed floats top-right, above the board and out of the
+        // way of clicks; its lines outlive board rebuilds.
+        feed.columnRight();
+        feed.space(4);
+        Table feedAnchor = new Table();
+        feedAnchor.setFillParent(true);
+        feedAnchor.top().right().padTop(96).padRight(28);
+        feedAnchor.add(feed);
+        feedAnchor.setTouchable(Touchable.disabled);
+        stage.addActor(feedAnchor);
+
         rebuild();
     }
 
@@ -83,16 +104,13 @@ public final class GameScreen extends ScreenAdapter {
 
     /** Rebuilds the whole board from the current state. */
     private void rebuild() {
-        stage.clear();
-        Table root = new Table();
-        root.setFillParent(true);
+        root.clearChildren();
         root.top();
         root.add(topStrip()).growX().height(72).pad(12, 24, 0, 24);
         root.row();
         root.add(roomRow()).grow();
         root.row();
         root.add(bottomStrip()).growX().height(64).pad(0, 24, 12, 24);
-        stage.addActor(root);
     }
 
     // --- top strip: health, depth ticker, avoid ---
@@ -261,7 +279,75 @@ public final class GameScreen extends ScreenAdapter {
     private void applyMove(Move move) {
         MoveResult result = engine.apply(state, move);
         state = result.state();
+        for (GameEvent event : result.events()) {
+            String line = feedLine(event);
+            if (line != null) {
+                pushFeedLine(line);
+            }
+        }
         rebuild();
+    }
+
+    // --- the fading feed ---
+
+    private void pushFeedLine(String text) {
+        Label line = label(text, theme.body, dim(Theme.BONE, 0.9f));
+        line.addAction(Actions.sequence(
+                Actions.delay(4f), Actions.fadeOut(1.5f), Actions.removeActor()));
+        feed.addActor(line);
+        while (feed.getChildren().size > 4) {
+            feed.removeActorAt(0, false);
+        }
+    }
+
+    /** Events the player should read; null for ones the board already shows. */
+    private static String feedLine(GameEvent event) {
+        return switch (event) {
+            case GameEvent.MonsterDefeated m -> {
+                String name = cardName(m.monster());
+                if (!m.withWeapon()) {
+                    yield "Fought " + name + " barehanded — took " + m.damageTaken();
+                }
+                yield m.damageTaken() > 0
+                        ? "Slew " + name + " — took " + m.damageTaken()
+                        : "Slew " + name + " — unharmed";
+            }
+            case GameEvent.PotionUsed p -> p.healed() > 0
+                    ? "Drank " + cardName(p.potion()) + " — healed " + p.healed()
+                    : "Drank " + cardName(p.potion()) + " — already full";
+            case GameEvent.PotionWasted p ->
+                    cardName(p.potion()) + " wasted — one potion a turn";
+            case GameEvent.WeaponEquipped w -> "Equipped " + cardName(w.weapon());
+            case GameEvent.WeaponDegraded d -> d.newThreshold() <= 2
+                    ? "The weapon is spent"
+                    : "The weapon dulls — slays < " + d.newThreshold();
+            case GameEvent.RoomAvoided ignored -> "Avoided the room";
+            default -> null; // RoomDealt is visible on the board; win/loss get the overlay
+        };
+    }
+
+    /** "the Queen of clubs", "the 7 of hearts" — the fonts have no suit glyphs. */
+    private static String cardName(Card card) {
+        String id = card.id();
+        char suitChar = id.charAt(id.length() - 1);
+        String suit = switch (suitChar) {
+            case 'S' -> "spades";
+            case 'H' -> "hearts";
+            case 'D' -> "diamonds";
+            case 'C' -> "clubs";
+            default -> null;
+        };
+        if (suit == null || id.length() < 2) {
+            return card.type().name().toLowerCase() + " " + card.value();
+        }
+        String rank = switch (id.substring(0, id.length() - 1)) {
+            case "J" -> "Jack";
+            case "Q" -> "Queen";
+            case "K" -> "King";
+            case "A" -> "Ace";
+            default -> id.substring(0, id.length() - 1);
+        };
+        return "the " + rank + " of " + suit;
     }
 
     /** Rank + suit identity, bottom-right like a playing card index. */
