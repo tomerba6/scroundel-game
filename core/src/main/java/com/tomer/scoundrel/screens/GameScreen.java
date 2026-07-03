@@ -24,6 +24,7 @@ import com.tomer.scoundrel.model.Card;
 import com.tomer.scoundrel.model.CardType;
 import com.tomer.scoundrel.model.EquippedWeapon;
 import com.tomer.scoundrel.model.GameState;
+import com.tomer.scoundrel.model.Status;
 import com.tomer.scoundrel.rules.GameEvent;
 import com.tomer.scoundrel.rules.Move;
 import com.tomer.scoundrel.rules.MoveResult;
@@ -52,6 +53,7 @@ public final class GameScreen extends ScreenAdapter {
     private final Table root = new Table();
     private final VerticalGroup feed = new VerticalGroup();
     private GameState state;
+    private Actor endOverlay;
 
     public GameScreen(Theme theme) {
         this.theme = theme;
@@ -104,6 +106,10 @@ public final class GameScreen extends ScreenAdapter {
 
     /** Rebuilds the whole board from the current state. */
     private void rebuild() {
+        if (endOverlay != null) {
+            endOverlay.remove();
+            endOverlay = null;
+        }
         root.clearChildren();
         root.top();
         root.add(topStrip()).growX().height(72).pad(12, 24, 0, 24);
@@ -111,6 +117,38 @@ public final class GameScreen extends ScreenAdapter {
         root.add(roomRow()).grow();
         root.row();
         root.add(bottomStrip()).growX().height(64).pad(0, 24, 12, 24);
+        if (state.status() != Status.IN_PROGRESS) {
+            endOverlay = buildEndOverlay();
+            stage.addActor(endOverlay);
+        }
+    }
+
+    /** Dim screen with the outcome, the score, and the way back in. */
+    private Actor buildEndOverlay() {
+        boolean won = state.status() == Status.WON;
+        Table overlay = new Table();
+        overlay.setFillParent(true);
+        overlay.setBackground(theme.solid(dim(Theme.SOOT, 0.85f)));
+        overlay.add(label(won ? "DUNGEON CLEARED" : "DEFEATED",
+                theme.title, won ? Theme.TORCHLIGHT : Theme.DRIED_BLOOD)).padBottom(4);
+        overlay.row();
+        overlay.add(label("score " + state.score(), theme.display, Theme.BONE)).padBottom(28);
+        overlay.row();
+        TextButton newGame = torchButton("New game");
+        newGame.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                startNewGame();
+            }
+        });
+        overlay.add(newGame);
+        return overlay;
+    }
+
+    private void startNewGame() {
+        state = engine.newGame(new Random().nextLong());
+        feed.clearChildren();
+        rebuild();
     }
 
     // --- top strip: health, depth ticker, avoid ---
