@@ -4,7 +4,7 @@ A desktop implementation of **Scoundrel**, a single-player roguelike card game, 
 
 Scoundrel is a solitaire dungeon crawl played with a trimmed deck of 44 cards. You descend through a "dungeon" of face-up cards, fighting monsters, picking up weapons, and drinking health potions, trying to survive to the bottom of the deck. It's quick, tense, and entirely a game of managing risk with the hand the shuffle deals you.
 
-> **Status:** early scaffolding. The project is a working libGDX skeleton — the rules engine and playable UI are not built yet. Running it today opens an empty window. See [Roadmap](#roadmap) for what's planned.
+> **Status:** playable. The full base game works — a pure, fully unit-tested rules engine and a plain Scene2D UI (typed card tiles, click to resolve, torchlit look). Card art, animations, and persistence are still to come. See [Roadmap](#roadmap).
 
 ## How to play
 
@@ -37,17 +37,21 @@ On Windows, use `gradlew.bat` instead of `./gradlew`.
 
 This is a Gradle multi-module project. The intended split (per `CLAUDE.md`) is:
 
-- **`core`** — all game logic. The rules engine here is meant to be **pure, headless Java with no libGDX dependency**, so it can be unit-tested without a window or render loop. This is where the model (cards, deck, state), the rules, and the Scene2D screens live.
+- **`core`** — all game logic. The rules engine (`model` + `rules` packages) is **pure, headless Java with no libGDX dependency**, unit-tested without a window or render loop. The Scene2D screens (`screens` package) draw the state and translate clicks into engine moves — no rule logic lives there.
 - **`lwjgl3`** — a thin desktop launcher (LWJGL3). No game logic.
 
 See [`CLAUDE.md`](CLAUDE.md) for the full design rules and the complete game specification.
 
 ## Roadmap
 
-- [ ] Pure model: deck, cards, and game state in `core`
-- [ ] Rules engine: room dealing, avoiding, combat, weapon degradation, scoring
-- [ ] Unit tests covering the tricky rules (degradation, one-potion-per-turn, scoring edge cases)
-- [ ] Scene2D UI to play a full game
+- [x] Pure model: deck, cards, and game state in `core`
+- [x] Rules engine: room dealing, avoiding, combat, weapon degradation, scoring
+- [x] Unit tests covering the tricky rules (degradation, one-potion-per-turn, scoring edge cases)
+- [x] Scene2D UI to play a full game (plain version: typed tiles, event feed, end overlay)
+- [ ] Card art, sprites, and animations
+- [ ] High scores (persisted)
+- [ ] Achievements & stats (built on the engine's event stream)
+- [ ] Difficulty variants (alternate rulesets, no engine changes)
 
 ## Credits & acknowledgements
 
