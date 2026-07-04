@@ -1,0 +1,138 @@
+# Scoundrel — UI Layer (plain version)
+
+This documents the Scene2D UI as it exists today: the decisions locked in the
+design interview, the visual tokens, the architecture, and every component on
+screen. It complements [`design.md`](design.md) (the rules engine); keep both
+in sync with the code.
+
+> **This is not the final look.** The current UI is the deliberate *plain*
+> version: flat color tiles, drawn suit shapes, text everywhere. Card art,
+> sprites, and animations are a later pass — the layout, theme seams, and
+> interaction model below were built so that pass swaps assets and adds motion
+> without rewriting screen logic.
+
+## Locked decisions (from the design interview)
+
+- **Layout: room-centered.** The four room cards dominate the center; thin HUD
+  strips top and bottom. No sidebar.
+- **Cards: typed tiles.** Role-colored (monster/weapon/potion), big value,
+  small rank + suit index in the corner.
+- **Input: click-then-pick.** A card with one legal move plays immediately on
+  click; a monster with both fight options pops a small two-button chooser at
+  the card. Avoid is a HUD button.
+- **Event log: fading feed.** The last few events float top-right and fade;
+  no permanent log panel.
+- **Flow:** launch straight into a new game; win/loss dims the board under an
+  overlay with the score and a New game button. No title screen yet.
+- **Window:** resizable, 1280×720 default, Fit viewport (letterboxed scaling).
+- **Mood: torchlit dungeon** — dark, warm, quiet.
+
+## Design tokens
+
+Palette (all constants in `screens.Theme`):
+
+| Token | Hex | Used for |
+|---|---|---|
+| soot | `#17130f` | background |
+| stone | `#241d16` | frames, strips, popups |
+| dried blood | `#8c2f22` | monster tiles, slain chips, DEFEATED |
+| iron | `#7a8794` | weapon tiles |
+| herbal | `#5d8a4a` | potion tiles |
+| torchlight | `#d9a441` | accent: Avoid, threshold plate, ticker, CLEARED |
+| bone | `#e8ddc7` | text, health |
+
+Type (generated at startup via `gdx-freetype` from TTFs in `assets/fonts/`,
+both SIL OFL, licenses bundled):
+
+- **IM Fell English** — display (64px card values, 42px overlay titles). Its
+  old-style numerals are a deliberate period touch (a big "11" reads a little
+  like Roman "II"; the corner index always shows the true identity in the sans
+  face).
+- **Alegreya Sans** regular/bold — HUD labels, buttons, feed, corner indices
+  (18px and 14px).
+
+Neither face has suit glyphs, so ♠♥♦♣ are drawn as pixmap shapes in `Theme`
+and tinted at use; feed copy writes names out ("the Queen of clubs").
+
+## Architecture
+
+- **View = f(state), rebuilt wholesale.** `GameScreen` holds the immutable
+  `GameState`; every move runs `apply`, replaces the state, and rebuilds the
+  whole widget tree from it. No incremental widget updates — if the state is
+  right, the screen is right. Known cost: rebuilt widgets have no identity
+  across moves, so the future animation pass needs an animation layer (or
+  identity-preserving diffs) on top.
+- **Dumb view.** The screen calls only `newGame` / `legalMoves` / `apply`.
+  Everything conditional (Avoid enabled, instant-play vs chooser, chooser
+  contents) derives from `legalMoves`. Zero rule logic in screens — even
+  damage previews were omitted rather than duplicate combat math in the UI.
+- **`Theme` owns every visual fact**: palette, fonts, flat drawables (a 1×1
+  white texture tinted per use), suit icons. Created once in `ScoundrelGame`,
+  disposed once, passed to screens. The sprite pass swaps Theme internals.
+- **Programmatic styles, no uiskin.** With zero art, the Scene2D `Skin`
+  JSON/atlas adds indirection; styles are built in code, compiler-checked.
+  (The unused liftoff `assets/ui/` skin remains and should be removed or
+  replaced in the art pass.) An atlas-backed Skin becomes worthwhile when
+  real textures arrive.
+- **`FitViewport` at a fixed 1280×720 virtual resolution** — all layout math
+  in one coordinate system, any window size letterboxes. Fonts are generated
+  once at design sizes.
+- **Three stage layers with distinct lifetimes:** the root board table
+  (cleared per rebuild), the feed anchor (persistent, `Touchable.disabled` so
+  it never steals clicks), and transient overlays (chooser, end screen) on
+  top. The end overlay is modal by construction — fill-parent with a
+  background swallows input to the dead board.
+- **Events feed the feed; state feeds everything else.** `MoveResult.events`
+  are consumed once for feed lines; persistent widgets render from state.
+  `RoomDealt` and `GameWon/Lost` are filtered (board and overlay own those
+  facts). The feed is the first real consumer of the observer seam that
+  achievements/stats will use.
+
+## Components on screen
+
+- **Top strip** — `HP` label, the charring health bar (bone fill lerping to
+  dried blood as health drops), health number; the **depth ticker** (one tick
+  per card of the deck, torchlight = still face-down, dark = gone; avoided
+  rooms visibly return ticks) with a `depth: N cards` caption; the **Avoid**
+  button (torchlight when legal, stone when not).
+- **Room row** — up to four typed tiles: type label, display-font value,
+  rank + suit index bottom-right. Weapon tiles use soot text on iron for
+  contrast; monster/potion tiles use bone.
+- **Chooser** — stone popup over the clicked card with one torchlight button
+  per legal move ("Use weapon" / "Barehanded"); clicking anywhere else
+  dismisses. Generic: a future card offering three moves gets three buttons.
+- **Trophy rail** (bottom-left) — equipped weapon mini-tile, slain-monster
+  chips in kill order, and the threshold plate: `slays anything` (fresh),
+  `slays < N`, or `spent` (slew a 2). Reads `Barehanded` when nothing is
+  equipped.
+- **Potion marker** (bottom-right) — `potion ready` (dim) or
+  `• potion used this turn` (torchlight).
+- **Fading feed** (top-right) — up to four lines, fading after ~4s:
+  "Slew the Queen of clubs — took 6", "Fought … barehanded — took 12",
+  "Drank the 7 of hearts — healed 5" / "— already full",
+  "… wasted — one potion a turn", "Equipped the 5 of diamonds",
+  "The weapon dulls — slays < 6" / "The weapon is spent",
+  "Avoided the room".
+- **End overlay** — dim soot over the board; `DUNGEON CLEARED` (torchlight)
+  or `DEFEATED` (dried blood), the score in display type, and **New game**
+  (reshuffles with a fresh random seed and clears the feed).
+
+## Files
+
+- `core/src/main/java/com/tomer/scoundrel/screens/Theme.java` — tokens,
+  fonts, drawables, suit shapes.
+- `core/src/main/java/com/tomer/scoundrel/screens/GameScreen.java` — the one
+  screen: layout builders, interaction, feed, overlay.
+- `core/src/main/java/com/tomer/scoundrel/ScoundrelGame.java` — creates the
+  Theme, boots into `GameScreen`, owns disposal.
+- `lwjgl3` launcher — 1280×720 window, title "Scoundrel".
+- `assets/fonts/` — the two typefaces plus OFL license texts.
+
+## What the art pass will change (and what it won't)
+
+Later work — card art and sprites inside the existing tile frames, ambient
+atmosphere, and motion (dealing, avoiding, combat feedback) — lands mostly in
+`Theme` and a new animation layer. What should *not* change: the dumb-view
+rule, the state-rebuild model as the source of truth, the legalMoves-driven
+interaction, and the event-stream feed. If an animation needs to know a rule,
+that's a sign the engine should expose it, not the UI re-derive it.
