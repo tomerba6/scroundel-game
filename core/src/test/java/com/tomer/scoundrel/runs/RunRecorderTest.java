@@ -1,0 +1,94 @@
+package com.tomer.scoundrel.runs;
+
+import com.tomer.scoundrel.model.Status;
+import com.tomer.scoundrel.rules.GameEvent;
+import org.junit.jupiter.api.Test;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
+
+import static com.tomer.scoundrel.runs.RunsTestData.monster;
+import static com.tomer.scoundrel.runs.RunsTestData.potion;
+import static com.tomer.scoundrel.runs.RunsTestData.result;
+import static com.tomer.scoundrel.runs.RunsTestData.sequenceClock;
+import static com.tomer.scoundrel.runs.RunsTestData.weapon;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class RunRecorderTest {
+
+    private static final Clock FIXED = Clock.fixed(Instant.parse("2026-07-06T10:00:00Z"), java.time.ZoneOffset.UTC);
+
+    @Test
+    void talliesCountersFromEvents() {
+        RunRecorder recorder = new RunRecorder(42L, "standard", FIXED);
+        recorder.observe(result(
+                new GameEvent.MonsterDefeated(monster("JC", 11), true, 6),
+                new GameEvent.WeaponDegraded(weapon(5), 11),
+                new GameEvent.RoomDealt(List.of())));
+        recorder.observe(result(
+                new GameEvent.MonsterDefeated(monster("2S", 2), false, 2),
+                new GameEvent.PotionUsed(potion(7), 5),
+                new GameEvent.PotionUsed(potion(3), 0),
+                new GameEvent.PotionWasted(potion(2)),
+                new GameEvent.WeaponEquipped(weapon(5)),
+                new GameEvent.RoomAvoided(List.of())));
+        recorder.observe(result(new GameEvent.GameLost(-24)));
+
+        RunRecord record = recorder.toRecord();
+        assertEquals(2, record.monstersDefeated());
+        assertEquals(8, record.damageTaken());
+        assertEquals(2, record.potionsDrunk());
+        assertEquals(5, record.healthHealed());
+        assertEquals(1, record.potionsWasted());
+        assertEquals(1, record.weaponsEquipped());
+        assertEquals(1, record.roomsAvoided());
+        assertEquals(Status.LOST, record.outcome());
+        assertEquals(-24, record.score());
+    }
+
+    @Test
+    void winIsCapturedWithItsScore() {
+        RunRecorder recorder = new RunRecorder(7L, "standard", FIXED);
+        recorder.observe(result(new GameEvent.GameWon(23)));
+        assertTrue(recorder.isFinished());
+        RunRecord record = recorder.toRecord();
+        assertEquals(Status.WON, record.outcome());
+        assertEquals(23, record.score());
+    }
+
+    @Test
+    void toRecordBeforeTheGameEndsThrows() {
+        RunRecorder recorder = new RunRecorder(7L, "standard", FIXED);
+        recorder.observe(result(new GameEvent.PotionUsed(potion(5), 5)));
+        assertFalse(recorder.isFinished());
+        assertThrows(IllegalStateException.class, recorder::toRecord);
+    }
+
+    @Test
+    void clockDrivesTimestampAndDuration() {
+        Instant start = Instant.parse("2026-07-06T10:00:00Z");
+        Instant end = Instant.parse("2026-07-06T10:05:10Z");
+        RunRecorder recorder = new RunRecorder(1L, "standard", sequenceClock(start, end));
+        recorder.observe(result(new GameEvent.GameWon(20)));
+        RunRecord record = recorder.toRecord();
+        assertEquals(end, record.endedAt());
+        assertEquals(310, record.seconds());
+    }
+
+    @Test
+    void seedAndRulesetIdPassThrough() {
+        RunRecorder withSeed = new RunRecorder(42L, "standard", FIXED);
+        withSeed.observe(result(new GameEvent.GameWon(20)));
+        assertEquals(42L, withSeed.toRecord().seed());
+        assertEquals("standard", withSeed.toRecord().rulesetId());
+
+        RunRecorder seedless = new RunRecorder(null, "standard", FIXED);
+        seedless.observe(result(new GameEvent.GameLost(-5)));
+        assertNull(seedless.toRecord().seed());
+    }
+}
