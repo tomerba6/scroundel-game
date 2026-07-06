@@ -25,6 +25,8 @@ A desktop implementation of **Scoundrel**, a single-player roguelike card game, 
   - `...scoundrel.model` — cards, deck, game state (pure).
   - `...scoundrel.rules` — actions and rule resolution (pure).
   - `...scoundrel.screens` — Scene2D screens (LibGDX-dependent).
+  - `...scoundrel.runs` — run recording + local high-score persistence (pure Java;
+    observes the engine from outside — `model`/`rules` never import it).
 - **Detailed design reference:** the full rules-engine design — the `model`/`rules`
   types, the turn loop, extension seams, and the locked edge-case decisions — is
   documented in [`docs/design.md`](docs/design.md) (prose + Mermaid diagrams).

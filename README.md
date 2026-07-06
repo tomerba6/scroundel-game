@@ -49,7 +49,7 @@ See [`CLAUDE.md`](CLAUDE.md) for the full design rules and the complete game spe
 - [x] Unit tests covering the tricky rules (degradation, one-potion-per-turn, scoring edge cases)
 - [x] Scene2D UI to play a full game (plain version: typed tiles, event feed, end overlay)
 - [ ] Card art, sprites, and animations
-- [ ] High scores (persisted)
+- [x] High scores (persisted to `~/.scoundrel/runs.log`; best shown on the end screen)
 - [ ] Achievements & stats (built on the engine's event stream)
 - [ ] Difficulty variants (alternate rulesets, no engine changes)
 

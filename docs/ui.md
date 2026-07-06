@@ -87,6 +87,11 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
   `RoomDealt` and `GameWon/Lost` are filtered (board and overlay own those
   facts). The feed is the first real consumer of the observer seam that
   achievements/stats will use.
+- **Run recording.** `ScoundrelGame` builds a `RunLog` (`~/.scoundrel/runs.log`)
+  and hands it to the screen. Each game gets a `RunRecorder` seeded with the
+  shuffle seed; `applyMove` feeds it every `MoveResult`, and the finished run
+  is appended before the end overlay shows. A storage failure is logged and
+  never interrupts play.
 
 ## Components on screen
 
@@ -114,8 +119,10 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
   "The weapon dulls — slays < 6" / "The weapon is spent",
   "Avoided the room".
 - **End overlay** — dim soot over the board; `DUNGEON CLEARED` (torchlight)
-  or `DEFEATED` (dried blood), the score in display type, and **New game**
-  (reshuffles with a fresh random seed and clears the feed).
+  or `DEFEATED` (dried blood), the score in display type, a best-score line
+  (`New best!` in torchlight, or `best N` dimmed — from the persisted run
+  history), and **New game** (reshuffles with a fresh random seed and clears
+  the feed).
 
 ## Files
 

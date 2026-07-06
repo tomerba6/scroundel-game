@@ -204,11 +204,17 @@ Applying a move returns the new state **and** the events that occurred, as
 `MoveResult(state, events)`. Effects emit semantic events (a monster defeated with
 its damage and method, a potion used or wasted, a weapon equipped, a weapon
 degraded); the engine emits structural and terminal events (room avoided, room
-dealt, game won, game lost). `GameEvent` is a sealed set of plain records.
+dealt, game won, game lost). `GameEvent` is a plain interface of record types —
+deliberately *not* sealed, so new card effects can emit their own events.
 Achievements, live statistics, the persisted aggregate-totals store, and the UI all
 observe this stream from outside the core. Because events are returned rather than
 pushed through registered listeners, the core holds no references to observers and
 stays fully testable ("this move emits exactly these events").
+
+Two observers exist today, both outside the engine: the UI's fading feed, and the
+`...scoundrel.runs` package — `RunRecorder` tallies each game's events and
+`RunLog` appends the finished run (seed, ruleset id, outcome, score, counters) to
+`~/.scoundrel/runs.log` as versioned, tolerantly-parsed key=value lines.
 
 ### Extension seams
 
@@ -224,8 +230,11 @@ The design opens exactly the seams the named future features require, and no mor
   `DeckDefinition`). Modes are expected to swap rules within the same
   4-card-room turn shape, which these seams cover; no engine change.
 - **Achievements and stats:** observe the `GameEvent` stream live and keep
-  persisted aggregate totals — both outside the core.
-- **High scores:** read the terminal `GameState.score` from outside the core.
+  persisted aggregate totals — both outside the core. Lifetime totals are sums
+  over the per-run counters already persisted in the run log, so no second
+  recording system is needed.
+- **High scores:** implemented — the `runs` package records every finished game
+  (the engine remains unaware of it); `HighScores` derives the table from the log.
 
 ### Edge-case decisions (locked)
 
