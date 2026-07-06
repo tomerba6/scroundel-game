@@ -1,8 +1,11 @@
 package com.tomer.scoundrel;
 
 import com.badlogic.gdx.Game;
+import com.tomer.scoundrel.runs.RunLog;
 import com.tomer.scoundrel.screens.GameScreen;
 import com.tomer.scoundrel.screens.Theme;
+
+import java.nio.file.Path;
 
 /** {@link com.badlogic.gdx.ApplicationListener} implementation shared by all platforms. */
 public class ScoundrelGame extends Game {
@@ -12,7 +15,9 @@ public class ScoundrelGame extends Game {
     @Override
     public void create() {
         theme = new Theme();
-        setScreen(new GameScreen(theme));
+        RunLog runLog = new RunLog(
+                Path.of(System.getProperty("user.home"), ".scoundrel", "runs.log"));
+        setScreen(new GameScreen(theme, runLog));
     }
 
     @Override

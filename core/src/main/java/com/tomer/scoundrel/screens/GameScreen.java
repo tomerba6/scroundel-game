@@ -31,8 +31,13 @@ import com.tomer.scoundrel.rules.MoveResult;
 import com.tomer.scoundrel.rules.Ruleset;
 import com.tomer.scoundrel.rules.Rulesets;
 import com.tomer.scoundrel.rules.ScoundrelEngine;
+import com.tomer.scoundrel.runs.HighScores;
+import com.tomer.scoundrel.runs.RunLog;
+import com.tomer.scoundrel.runs.RunRecorder;
 
+import java.time.Clock;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.Random;
 
 /**
@@ -45,22 +50,27 @@ public final class GameScreen extends ScreenAdapter {
 
     private static final float WORLD_WIDTH = 1280;
     private static final float WORLD_HEIGHT = 720;
+    private static final String RULESET_ID = "standard";
 
     private final Theme theme;
     private final Ruleset rules;
     private final ScoundrelEngine engine;
     private final Stage stage;
+    private final RunLog runLog;
     private final Table root = new Table();
     private final VerticalGroup feed = new VerticalGroup();
     private GameState state;
+    private RunRecorder recorder;
+    private String endBestLine;
     private Actor endOverlay;
 
-    public GameScreen(Theme theme) {
+    public GameScreen(Theme theme, RunLog runLog) {
         this.theme = theme;
+        this.runLog = runLog;
         this.rules = Rulesets.standard();
         this.engine = new ScoundrelEngine(rules);
         this.stage = new Stage(new FitViewport(WORLD_WIDTH, WORLD_HEIGHT));
-        this.state = engine.newGame(new Random().nextLong());
+        startRun();
 
         root.setFillParent(true);
         stage.addActor(root);
@@ -132,8 +142,14 @@ public final class GameScreen extends ScreenAdapter {
         overlay.add(label(won ? "DUNGEON CLEARED" : "DEFEATED",
                 theme.title, won ? Theme.TORCHLIGHT : Theme.DRIED_BLOOD)).padBottom(4);
         overlay.row();
-        overlay.add(label("score " + state.score(), theme.display, Theme.BONE)).padBottom(28);
+        overlay.add(label("score " + state.score(), theme.display, Theme.BONE)).padBottom(8);
         overlay.row();
+        if (endBestLine != null) {
+            Color bestColor = endBestLine.equals("New best!")
+                    ? Theme.TORCHLIGHT : dim(Theme.BONE, 0.6f);
+            overlay.add(label(endBestLine, theme.bodyBold, bestColor)).padBottom(24);
+            overlay.row();
+        }
         TextButton newGame = torchButton("New game");
         newGame.addListener(new ChangeListener() {
             @Override
@@ -146,7 +162,7 @@ public final class GameScreen extends ScreenAdapter {
     }
 
     private void startNewGame() {
-        state = engine.newGame(new Random().nextLong());
+        startRun();
         feed.clearChildren();
         rebuild();
     }
@@ -314,9 +330,35 @@ public final class GameScreen extends ScreenAdapter {
         };
     }
 
+    /** Fresh shuffle, fresh recorder; the seed is captured for the run record. */
+    private void startRun() {
+        long seed = new Random().nextLong();
+        state = engine.newGame(seed);
+        recorder = new RunRecorder(seed, RULESET_ID, Clock.systemUTC());
+        endBestLine = null;
+    }
+
+    /** Persists the finished run; a storage failure must never break play. */
+    private void recordRun() {
+        try {
+            OptionalInt bestBefore = HighScores.best(runLog.readAll());
+            runLog.append(recorder.toRecord());
+            endBestLine = bestBefore.isEmpty() || state.score() > bestBefore.getAsInt()
+                    ? "New best!"
+                    : "best " + bestBefore.getAsInt();
+        } catch (RuntimeException e) {
+            Gdx.app.error("scoundrel", "failed to record the run", e);
+            endBestLine = null;
+        }
+    }
+
     private void applyMove(Move move) {
         MoveResult result = engine.apply(state, move);
         state = result.state();
+        recorder.observe(result);
+        if (state.status() != Status.IN_PROGRESS) {
+            recordRun();
+        }
         for (GameEvent event : result.events()) {
             String line = feedLine(event);
             if (line != null) {
