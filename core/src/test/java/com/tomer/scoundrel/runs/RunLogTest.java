@@ -1,0 +1,61 @@
+package com.tomer.scoundrel.runs;
+
+import com.tomer.scoundrel.model.Status;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class RunLogTest {
+
+    @TempDir
+    Path dir;
+
+    private static RunRecord run(int score, String endedAt) {
+        return new RunRecord(42L, "standard", score >= 0 ? Status.WON : Status.LOST,
+                score, Instant.parse(endedAt), 60, 1, 2, 3, 4, 5, 6, 7);
+    }
+
+    @Test
+    void appendCreatesMissingDirectoriesAndFile() {
+        Path file = dir.resolve("nested").resolve("deeper").resolve("runs.log");
+        RunLog log = new RunLog(file);
+        RunRecord record = run(20, "2026-07-06T10:00:00Z");
+        log.append(record);
+        assertTrue(Files.exists(file));
+        assertEquals(List.of(record), log.readAll());
+    }
+
+    @Test
+    void appendsAccumulateInOrder() {
+        RunLog log = new RunLog(dir.resolve("runs.log"));
+        RunRecord first = run(5, "2026-07-06T10:00:00Z");
+        RunRecord second = run(-12, "2026-07-06T11:00:00Z");
+        RunRecord third = run(23, "2026-07-06T12:00:00Z");
+        log.append(first);
+        log.append(second);
+        log.append(third);
+        assertEquals(List.of(first, second, third), log.readAll());
+    }
+
+    @Test
+    void readingWithoutAFileIsEmpty() {
+        assertEquals(List.of(), new RunLog(dir.resolve("never-written.log")).readAll());
+    }
+
+    @Test
+    void corruptLinesAreSkippedNotFatal() throws Exception {
+        Path file = dir.resolve("runs.log");
+        RunRecord good = run(20, "2026-07-06T10:00:00Z");
+        RunRecord alsoGood = run(7, "2026-07-06T11:00:00Z");
+        Files.writeString(file, good.toLine() + "\n### corrupted ###\nv=9\tfuture=stuff\n"
+                + alsoGood.toLine() + "\n");
+        assertEquals(List.of(good, alsoGood), new RunLog(file).readAll());
+    }
+}
