@@ -4,12 +4,14 @@ import com.tomer.scoundrel.model.Status;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RunLogTest {
@@ -57,5 +59,23 @@ class RunLogTest {
         Files.writeString(file, good.toLine() + "\n### corrupted ###\nv=9\tfuture=stuff\n"
                 + alsoGood.toLine() + "\n");
         assertEquals(List.of(good, alsoGood), new RunLog(file).readAll());
+    }
+
+    @Test
+    void unwritableLocationThrowsUncheckedIOExceptionForTheCallerToHandle() throws Exception {
+        // The log's parent "directory" is actually a file, so createDirectories fails.
+        Path blocker = dir.resolve("blocker");
+        Files.createFile(blocker);
+        RunLog log = new RunLog(blocker.resolve("runs.log"));
+        assertThrows(UncheckedIOException.class, () -> log.append(run(20, "2026-07-06T10:00:00Z")));
+    }
+
+    @Test
+    void mixedLineEndingsFromAnotherOsReadFine() throws Exception {
+        Path file = dir.resolve("runs.log");
+        RunRecord unixWritten = run(5, "2026-07-06T10:00:00Z");
+        RunRecord windowsWritten = run(9, "2026-07-06T11:00:00Z");
+        Files.writeString(file, unixWritten.toLine() + "\n" + windowsWritten.toLine() + "\r\n");
+        assertEquals(List.of(unixWritten, windowsWritten), new RunLog(file).readAll());
     }
 }
