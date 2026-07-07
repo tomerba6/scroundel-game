@@ -22,8 +22,12 @@ in sync with the code.
   the card. Avoid is a HUD button.
 - **Event log: fading feed.** The last few events float top-right and fade;
   no permanent log panel.
-- **Flow:** launch straight into a new game; win/loss dims the board under an
-  overlay with the score and a New game button. No title screen yet.
+- **Flow (revised 2026-07-07):** launch lands on a tiny **title screen** —
+  the navigation anchor every future menu (achievements, variants) hangs off:
+  New game / Records / a dim credit line. Win/loss dims the board under an
+  overlay with the score, best line, New game, and Records. **Records is
+  reachable only between games** (title + end overlay): a run, once started,
+  is uninterruptible — consistent with quit-outs being unrecorded.
 - **Window:** resizable, 1280×720 default, Fit viewport (letterboxed scaling).
 - **Mood: torchlit dungeon** — dark, warm, quiet.
 
@@ -71,9 +75,14 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
   Animations are **blocking but skippable**: a fullscreen gate holds input
   while one plays, and any click cuts straight to the settled board — always
   safe, because nothing mid-flight carries game state. Durations, stagger,
-  and card size are `Theme` tokens. Locked motion direction: traveling cards
-  (deal + avoid done) and feedback pulses (later); no reveals or ambient
-  effects yet.
+  and card size are `Theme` tokens. Locked motion set, both shipped:
+  traveling cards (deal-in + avoid sweep) and feedback pulses (damage
+  shudders the HP bar and flashes the number dried blood; healing glows the
+  fill back in, herbal). No reveals or ambient effects yet.
+- **Navigation.** `ScoundrelGame` is the navigator: it owns the shared
+  `Theme` and `RunLog`, exposes `showTitle`/`showGame`/`showRecords`, and
+  disposes the outgoing screen on every switch. Screens are cheap and built
+  fresh each time; nothing is cached across switches.
 - **Dumb view.** The screen calls only `newGame` / `legalMoves` / `apply`.
   Everything conditional (Avoid enabled, instant-play vs chooser, chooser
   contents) derives from `legalMoves`. Zero rule logic in screens — even
@@ -133,8 +142,16 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
 - **End overlay** — dim soot over the board; `DUNGEON CLEARED` (torchlight)
   or `DEFEATED` (dried blood), the score in display type, a best-score line
   (`New best!` in torchlight, or `best N` dimmed — from the persisted run
-  history), and **New game** (reshuffles with a fresh random seed and clears
-  the feed).
+  history), **New game** (reshuffles in place), and **Records**.
+- **Title screen** — `SCOUNDREL` in display type over soot, New game and
+  Records buttons, and a dim designer-credit line. Deliberately empty
+  otherwise; future menus join the button column.
+- **THE LEDGER (records screen)** — the top 10 runs as a dungeon ledger:
+  Roman-numeral ranks in torchlight, scores in IM Fell (dried blood when
+  negative), outcome, date, duration, monsters slain, hairline rules between
+  rows. Beside it, lifetime totals headed `ACROSS N FINISHED RUNS` (the
+  label encodes the quit-runs decision: finished games are the whole
+  universe). Empty state invites a first run; Back returns to the title.
 
 ## Files
 
@@ -144,8 +161,10 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
   screen: layout builders, interaction, feed, overlay, run recording.
 - `core/src/main/java/com/tomer/scoundrel/screens/Choreographer.java` — the
   flight layer: deal-in and avoid-sweep choreographies, input gate, skip.
+- `core/src/main/java/com/tomer/scoundrel/screens/TitleScreen.java` /
+  `RecordsScreen.java` — the navigation anchor and THE LEDGER.
 - `core/src/main/java/com/tomer/scoundrel/screens/CardTiles.java` /
-  `Widgets.java` — shared tile and label builders.
+  `Widgets.java` — shared tile, label, and button builders.
 - `core/src/main/java/com/tomer/scoundrel/ScoundrelGame.java` — creates the
   Theme, boots into `GameScreen`, owns disposal.
 - `lwjgl3` launcher — 1280×720 window, title "Scoundrel".
@@ -153,9 +172,9 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
 
 ## What the art pass will change (and what it won't)
 
-Later work — card art and sprites inside the existing tile frames, ambient
-atmosphere, and the remaining motion (combat feedback pulses) — lands mostly
-in `Theme` and the existing `Choreographer`. What should *not* change: the
+Later work — card art and sprites inside the existing tile frames and
+ambient atmosphere — lands mostly in `Theme` and the existing
+`Choreographer`. What should *not* change: the
 dumb-view rule, the state-rebuild model as the source of truth, the
 legalMoves-driven interaction, and the event-stream feed. If an animation
 needs to know a rule, that's a sign the engine should expose it, not the UI

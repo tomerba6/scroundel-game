@@ -50,7 +50,8 @@ See [`CLAUDE.md`](CLAUDE.md) for the full design rules and the complete game spe
 - [x] Scene2D UI to play a full game (plain version: typed tiles, event feed, end overlay)
 - [ ] Card art, sprites, and animations
 - [x] High scores (persisted to `~/.scoundrel/runs.log`; best shown on the end screen)
-- [ ] Achievements & stats (built on the engine's event stream)
+- [x] Lifetime stats — THE LEDGER records screen (top runs + totals over the run log)
+- [ ] Achievements (built on the engine's event stream)
 - [ ] Difficulty variants (alternate rulesets, no engine changes)
 
 ## Credits & acknowledgements
