@@ -59,9 +59,21 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
 - **View = f(state), rebuilt wholesale.** `GameScreen` holds the immutable
   `GameState`; every move runs `apply`, replaces the state, and rebuilds the
   whole widget tree from it. No incremental widget updates — if the state is
-  right, the screen is right. Known cost: rebuilt widgets have no identity
-  across moves, so the future animation pass needs an animation layer (or
-  identity-preserving diffs) on top.
+  right, the screen is right. Motion never weakens this: the `Choreographer`
+  (below) plays cosmetic flights *over* rebuilds, so widget identity across
+  moves is never needed.
+- **Choreographer: cosmetic motion over the final board.** After a move the
+  board is rebuilt first (truth before motion), then flight proxies — built by
+  the same `CardTiles` factory as the real tiles, which hide meanwhile —
+  replay the transition above it: dealt cards fly out of the depth ticker
+  (the dungeon made physical), the carryover card slides from its old slot,
+  and an avoided room sweeps up into the ticker before the next deal.
+  Animations are **blocking but skippable**: a fullscreen gate holds input
+  while one plays, and any click cuts straight to the settled board — always
+  safe, because nothing mid-flight carries game state. Durations, stagger,
+  and card size are `Theme` tokens. Locked motion direction: traveling cards
+  (deal + avoid done) and feedback pulses (later); no reveals or ambient
+  effects yet.
 - **Dumb view.** The screen calls only `newGame` / `legalMoves` / `apply`.
   Everything conditional (Avoid enabled, instant-play vs chooser, chooser
   contents) derives from `legalMoves`. Zero rule logic in screens — even
@@ -126,10 +138,14 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
 
 ## Files
 
-- `core/src/main/java/com/tomer/scoundrel/screens/Theme.java` — tokens,
-  fonts, drawables, suit shapes.
+- `core/src/main/java/com/tomer/scoundrel/screens/Theme.java` — tokens
+  (palette, motion timings, card size), fonts, drawables, suit shapes.
 - `core/src/main/java/com/tomer/scoundrel/screens/GameScreen.java` — the one
-  screen: layout builders, interaction, feed, overlay.
+  screen: layout builders, interaction, feed, overlay, run recording.
+- `core/src/main/java/com/tomer/scoundrel/screens/Choreographer.java` — the
+  flight layer: deal-in and avoid-sweep choreographies, input gate, skip.
+- `core/src/main/java/com/tomer/scoundrel/screens/CardTiles.java` /
+  `Widgets.java` — shared tile and label builders.
 - `core/src/main/java/com/tomer/scoundrel/ScoundrelGame.java` — creates the
   Theme, boots into `GameScreen`, owns disposal.
 - `lwjgl3` launcher — 1280×720 window, title "Scoundrel".
@@ -138,8 +154,9 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
 ## What the art pass will change (and what it won't)
 
 Later work — card art and sprites inside the existing tile frames, ambient
-atmosphere, and motion (dealing, avoiding, combat feedback) — lands mostly in
-`Theme` and a new animation layer. What should *not* change: the dumb-view
-rule, the state-rebuild model as the source of truth, the legalMoves-driven
-interaction, and the event-stream feed. If an animation needs to know a rule,
-that's a sign the engine should expose it, not the UI re-derive it.
+atmosphere, and the remaining motion (combat feedback pulses) — lands mostly
+in `Theme` and the existing `Choreographer`. What should *not* change: the
+dumb-view rule, the state-rebuild model as the source of truth, the
+legalMoves-driven interaction, and the event-stream feed. If an animation
+needs to know a rule, that's a sign the engine should expose it, not the UI
+re-derive it.
