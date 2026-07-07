@@ -12,7 +12,6 @@ import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
-import com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.VerticalGroup;
@@ -36,9 +35,15 @@ import com.tomer.scoundrel.runs.RunLog;
 import com.tomer.scoundrel.runs.RunRecorder;
 
 import java.time.Clock;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Random;
+
+import static com.tomer.scoundrel.screens.Widgets.dim;
+import static com.tomer.scoundrel.screens.Widgets.label;
 
 /**
  * The one in-game screen: draws the current GameState and (in later slices)
@@ -59,6 +64,9 @@ public final class GameScreen extends ScreenAdapter {
     private final RunLog runLog;
     private final Table root = new Table();
     private final VerticalGroup feed = new VerticalGroup();
+    private final Choreographer choreographer;
+    private final Map<Card, Table> roomTiles = new LinkedHashMap<>();
+    private Actor tickerTicks;
     private GameState state;
     private RunRecorder recorder;
     private String endBestLine;
@@ -70,6 +78,7 @@ public final class GameScreen extends ScreenAdapter {
         this.rules = Rulesets.standard();
         this.engine = new ScoundrelEngine(rules);
         this.stage = new Stage(new FitViewport(WORLD_WIDTH, WORLD_HEIGHT));
+        this.choreographer = new Choreographer(stage, theme);
         startRun();
 
         root.setFillParent(true);
@@ -162,6 +171,7 @@ public final class GameScreen extends ScreenAdapter {
     }
 
     private void startNewGame() {
+        choreographer.finish();
         startRun();
         feed.clearChildren();
         rebuild();
@@ -207,6 +217,7 @@ public final class GameScreen extends ScreenAdapter {
         int total = rules.deck().cards().size();
         Table ticker = new Table();
         Table ticks = new Table();
+        tickerTicks = ticks;
         for (int i = 0; i < total; i++) {
             Color c = i < remaining ? Theme.TORCHLIGHT : consumed;
             ticks.add(new Image(theme.solid(c))).width(4).height(16).padRight(2);
@@ -245,6 +256,7 @@ public final class GameScreen extends ScreenAdapter {
     // --- center: the room ---
 
     private Actor roomRow() {
+        roomTiles.clear();
         Table row = new Table();
         for (Card card : state.room()) {
             row.add(cardTile(card)).size(170, 240).pad(12);
@@ -253,15 +265,8 @@ public final class GameScreen extends ScreenAdapter {
     }
 
     private Actor cardTile(Card card) {
-        Color background = roleColor(card.type());
-        Color text = card.type() == CardType.WEAPON ? Theme.SOOT : Theme.BONE;
-        Table tile = new Table();
-        tile.setBackground(theme.solid(background));
-        tile.add(label(card.type().name(), theme.small, dim(text, 0.7f))).padTop(12);
-        tile.row();
-        tile.add(label(String.valueOf(card.value()), theme.display, text)).expand();
-        tile.row();
-        tile.add(cardCorner(card, text)).right().padRight(12).padBottom(10);
+        Table tile = CardTiles.build(theme, card);
+        roomTiles.put(card, tile);
         tile.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -365,7 +370,28 @@ public final class GameScreen extends ScreenAdapter {
                 pushFeedLine(line);
             }
         }
+        Map<String, Vector2> previousSlots = captureRoomSlots();
         rebuild();
+        boolean roomDealt = result.events().stream()
+                .anyMatch(e -> e instanceof GameEvent.RoomDealt);
+        if (state.status() == Status.IN_PROGRESS && roomDealt) {
+            root.validate(); // force a fresh layout so tile destinations are real
+            choreographer.playDealIn(roomTiles, previousSlots, tickerCenter());
+        }
+    }
+
+    /** Stage positions of the outgoing room tiles, keyed by card id. */
+    private Map<String, Vector2> captureRoomSlots() {
+        Map<String, Vector2> slots = new HashMap<>();
+        roomTiles.forEach((card, tile) ->
+                slots.put(card.id(), tile.localToStageCoordinates(new Vector2(0, 0))));
+        return slots;
+    }
+
+    /** Where dealt cards fly from: the depth ticker is the dungeon. */
+    private Vector2 tickerCenter() {
+        return tickerTicks.localToStageCoordinates(
+                new Vector2(tickerTicks.getWidth() / 2f, tickerTicks.getHeight() / 2f));
     }
 
     // --- the fading feed ---
@@ -430,26 +456,6 @@ public final class GameScreen extends ScreenAdapter {
         return "the " + rank + " of " + suit;
     }
 
-    /** Rank + suit identity, bottom-right like a playing card index. */
-    private Actor cardCorner(Card card, Color text) {
-        Table corner = new Table();
-        String id = card.id();
-        char suit = id.charAt(id.length() - 1);
-        if (id.length() >= 2 && "SHDC".indexOf(suit) >= 0) {
-            corner.add(label(id.substring(0, id.length() - 1), theme.bodyBold, text)).padRight(4);
-            corner.add(new Image(theme.suitIcon(suit, text))).size(14, 14);
-        }
-        return corner;
-    }
-
-    private static Color roleColor(CardType type) {
-        return switch (type) {
-            case MONSTER -> Theme.DRIED_BLOOD;
-            case WEAPON -> Theme.IRON;
-            case POTION -> Theme.HERBAL;
-        };
-    }
-
     // --- bottom strip: trophy rail and potion marker ---
 
     private Actor bottomStrip() {
@@ -500,15 +506,4 @@ public final class GameScreen extends ScreenAdapter {
                 : label("potion ready", theme.body, dim(Theme.BONE, 0.4f));
     }
 
-    // --- small helpers ---
-
-    private static Label label(String text, com.badlogic.gdx.graphics.g2d.BitmapFont font, Color color) {
-        return new Label(text, new LabelStyle(font, color));
-    }
-
-    private static Color dim(Color color, float alpha) {
-        Color c = new Color(color);
-        c.a = alpha;
-        return c;
-    }
 }

@@ -32,6 +32,11 @@ public final class Theme implements Disposable {
     public static final Color TORCHLIGHT = Color.valueOf("d9a441");
     public static final Color BONE = Color.valueOf("e8ddc7");
 
+    // Motion tokens (seconds) — the art pass tunes these in one place.
+    public static final float DEAL_DURATION = 0.28f;
+    public static final float DEAL_STAGGER = 0.07f;
+    public static final float SWEEP_DURATION = 0.30f;
+
     /** Characters beyond the freetype defaults used by the UI copy. */
     private static final String EXTRA_CHARS = "—–×•";
 
