@@ -19,6 +19,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.tomer.scoundrel.ScoundrelGame;
 import com.tomer.scoundrel.model.Card;
 import com.tomer.scoundrel.model.CardType;
 import com.tomer.scoundrel.model.EquippedWeapon;
@@ -44,6 +45,7 @@ import java.util.Random;
 
 import static com.tomer.scoundrel.screens.Widgets.dim;
 import static com.tomer.scoundrel.screens.Widgets.label;
+import static com.tomer.scoundrel.screens.Widgets.torchButton;
 
 /**
  * The one in-game screen: draws the current GameState and (in later slices)
@@ -53,10 +55,9 @@ import static com.tomer.scoundrel.screens.Widgets.label;
  */
 public final class GameScreen extends ScreenAdapter {
 
-    private static final float WORLD_WIDTH = 1280;
-    private static final float WORLD_HEIGHT = 720;
     private static final String RULESET_ID = "standard";
 
+    private final ScoundrelGame game;
     private final Theme theme;
     private final Ruleset rules;
     private final ScoundrelEngine engine;
@@ -72,12 +73,13 @@ public final class GameScreen extends ScreenAdapter {
     private String endBestLine;
     private Actor endOverlay;
 
-    public GameScreen(Theme theme, RunLog runLog) {
+    public GameScreen(ScoundrelGame game, Theme theme, RunLog runLog) {
+        this.game = game;
         this.theme = theme;
         this.runLog = runLog;
         this.rules = Rulesets.standard();
         this.engine = new ScoundrelEngine(rules);
-        this.stage = new Stage(new FitViewport(WORLD_WIDTH, WORLD_HEIGHT));
+        this.stage = new Stage(new FitViewport(Theme.WORLD_WIDTH, Theme.WORLD_HEIGHT));
         this.choreographer = new Choreographer(stage, theme);
         startRun();
 
@@ -159,14 +161,23 @@ public final class GameScreen extends ScreenAdapter {
             overlay.add(label(endBestLine, theme.bodyBold, bestColor)).padBottom(24);
             overlay.row();
         }
-        TextButton newGame = torchButton("New game");
+        TextButton newGame = torchButton(theme, "New game");
         newGame.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
                 startNewGame();
             }
         });
-        overlay.add(newGame);
+        overlay.add(newGame).padBottom(10);
+        overlay.row();
+        TextButton records = torchButton(theme, "Records");
+        records.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                game.showRecords();
+            }
+        });
+        overlay.add(records);
         return overlay;
     }
 
@@ -230,7 +241,7 @@ public final class GameScreen extends ScreenAdapter {
     }
 
     private Actor avoidButton() {
-        TextButton button = torchButton("Avoid");
+        TextButton button = torchButton(theme, "Avoid");
         button.setDisabled(!engine.legalMoves(state).contains(new Move.AvoidRoom()));
         button.addListener(new ChangeListener() {
             @Override
@@ -238,18 +249,6 @@ public final class GameScreen extends ScreenAdapter {
                 applyMove(new Move.AvoidRoom());
             }
         });
-        return button;
-    }
-
-    private TextButton torchButton(String text) {
-        TextButton.TextButtonStyle style = new TextButton.TextButtonStyle();
-        style.font = theme.bodyBold;
-        style.up = theme.solid(Theme.TORCHLIGHT);
-        style.fontColor = Theme.SOOT;
-        style.disabled = theme.solid(Theme.STONE);
-        style.disabledFontColor = dim(Theme.BONE, 0.35f);
-        TextButton button = new TextButton(text, style);
-        button.pad(6, 20, 6, 20);
         return button;
     }
 
@@ -292,7 +291,7 @@ public final class GameScreen extends ScreenAdapter {
     private void showChooser(List<Move> moves, Actor tile) {
         Group overlay = new Group();
         Actor catcher = new Actor();
-        catcher.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+        catcher.setBounds(0, 0, Theme.WORLD_WIDTH, Theme.WORLD_HEIGHT);
         catcher.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -306,7 +305,7 @@ public final class GameScreen extends ScreenAdapter {
         popup.pad(8);
         popup.defaults().growX().space(6);
         for (Move move : moves) {
-            TextButton button = torchButton(moveLabel(move));
+            TextButton button = torchButton(theme, moveLabel(move));
             button.addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {

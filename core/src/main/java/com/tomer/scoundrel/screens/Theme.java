@@ -32,6 +32,10 @@ public final class Theme implements Disposable {
     public static final Color TORCHLIGHT = Color.valueOf("d9a441");
     public static final Color BONE = Color.valueOf("e8ddc7");
 
+    // Virtual resolution shared by every screen's Fit viewport.
+    public static final float WORLD_WIDTH = 1280;
+    public static final float WORLD_HEIGHT = 720;
+
     // Motion tokens (seconds) — the art pass tunes these in one place.
     public static final float DEAL_DURATION = 0.28f;
     public static final float DEAL_STAGGER = 0.07f;
