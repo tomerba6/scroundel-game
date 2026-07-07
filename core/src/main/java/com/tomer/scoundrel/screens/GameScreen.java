@@ -259,7 +259,7 @@ public final class GameScreen extends ScreenAdapter {
         roomTiles.clear();
         Table row = new Table();
         for (Card card : state.room()) {
-            row.add(cardTile(card)).size(170, 240).pad(12);
+            row.add(cardTile(card)).size(Theme.CARD_WIDTH, Theme.CARD_HEIGHT).pad(12);
         }
         return row;
     }
@@ -372,11 +372,20 @@ public final class GameScreen extends ScreenAdapter {
         }
         Map<String, Vector2> previousSlots = captureRoomSlots();
         rebuild();
-        boolean roomDealt = result.events().stream()
-                .anyMatch(e -> e instanceof GameEvent.RoomDealt);
-        if (state.status() == Status.IN_PROGRESS && roomDealt) {
-            root.validate(); // force a fresh layout so tile destinations are real
-            choreographer.playDealIn(roomTiles, previousSlots, tickerCenter());
+        if (state.status() == Status.IN_PROGRESS) {
+            List<Card> avoided = result.events().stream()
+                    .filter(e -> e instanceof GameEvent.RoomAvoided)
+                    .map(e -> ((GameEvent.RoomAvoided) e).room())
+                    .findFirst().orElse(null);
+            boolean roomDealt = result.events().stream()
+                    .anyMatch(e -> e instanceof GameEvent.RoomDealt);
+            if (avoided != null) {
+                root.validate(); // force a fresh layout so tile destinations are real
+                choreographer.playAvoid(avoided, previousSlots, roomTiles, tickerCenter());
+            } else if (roomDealt) {
+                root.validate();
+                choreographer.playDealIn(roomTiles, previousSlots, tickerCenter());
+            }
         }
     }
 

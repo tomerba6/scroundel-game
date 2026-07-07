@@ -37,6 +37,10 @@ public final class Theme implements Disposable {
     public static final float DEAL_STAGGER = 0.07f;
     public static final float SWEEP_DURATION = 0.30f;
 
+    // Card tile size (virtual pixels), shared by the board layout and flight proxies.
+    public static final float CARD_WIDTH = 170;
+    public static final float CARD_HEIGHT = 240;
+
     /** Characters beyond the freetype defaults used by the UI copy. */
     private static final String EXTRA_CHARS = "—–×•";
 

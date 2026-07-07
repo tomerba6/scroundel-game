@@ -55,28 +55,67 @@ final class Choreographer {
      * must iterate in room order for the stagger to read left-to-right.
      */
     void playDealIn(Map<Card, Table> roomTiles, Map<String, Vector2> previousSlots, Vector2 dungeonSource) {
+        begin();
+        float total = spawnDealProxies(roomTiles, previousSlots, dungeonSource, 0f);
+        flightLayer.addAction(Actions.delay(total, Actions.run(this::finish)));
+    }
+
+    /**
+     * Avoid: the outgoing room sweeps up into the dungeon (the depth ticker),
+     * then the fresh room deals in — everything from the ticker, including
+     * any cards the shallow end-of-dungeon deals right back out.
+     */
+    void playAvoid(List<Card> avoidedCards, Map<String, Vector2> previousSlots,
+                   Map<Card, Table> roomTiles, Vector2 dungeonSource) {
+        begin();
+        for (Card card : avoidedCards) {
+            Vector2 from = previousSlots.get(card.id());
+            if (from == null) {
+                continue;
+            }
+            Table proxy = buildProxy(card);
+            proxy.setPosition(from.x, from.y);
+            proxy.addAction(Actions.parallel(
+                    Actions.moveTo(dungeonSource.x - Theme.CARD_WIDTH / 2f,
+                            dungeonSource.y - Theme.CARD_HEIGHT / 2f,
+                            Theme.SWEEP_DURATION, Interpolation.pow2In),
+                    Actions.scaleTo(0.15f, 0.15f, Theme.SWEEP_DURATION, Interpolation.pow2In),
+                    Actions.delay(Theme.SWEEP_DURATION * 0.4f,
+                            Actions.fadeOut(Theme.SWEEP_DURATION * 0.6f))));
+            flightLayer.addActor(proxy);
+        }
+        float total = spawnDealProxies(roomTiles, Map.of(), dungeonSource, Theme.SWEEP_DURATION);
+        flightLayer.addAction(Actions.delay(total, Actions.run(this::finish)));
+    }
+
+    private void begin() {
         finish();
         playing = true;
         gate.setBounds(0, 0, stage.getWidth(), stage.getHeight());
         stage.addActor(flightLayer);
         stage.addActor(gate);
+    }
 
-        float longest = 0;
+    /**
+     * Hides the real tiles and spawns their flight proxies; deal actions
+     * start after {@code baseDelay}. Returns the time until the last proxy
+     * lands. Proxies waiting on a delay sit invisible at the ticker.
+     */
+    private float spawnDealProxies(Map<Card, Table> roomTiles, Map<String, Vector2> previousSlots,
+                                   Vector2 dungeonSource, float baseDelay) {
+        float longest = baseDelay;
         int slot = 0;
         for (Map.Entry<Card, Table> entry : roomTiles.entrySet()) {
             Card card = entry.getKey();
             Table tile = entry.getValue();
             Vector2 destination = tile.localToStageCoordinates(new Vector2(0, 0));
             Vector2 from = previousSlots.get(card.id());
-            float delay = slot * Theme.DEAL_STAGGER;
+            float delay = baseDelay + slot * Theme.DEAL_STAGGER;
 
             tile.setVisible(false);
             hiddenTiles.add(tile);
 
-            Table proxy = CardTiles.build(theme, card);
-            proxy.setSize(tile.getWidth(), tile.getHeight());
-            proxy.setTransform(true);
-            proxy.setOrigin(tile.getWidth() / 2f, tile.getHeight() / 2f);
+            Table proxy = buildProxy(card);
             if (from != null) {
                 // The carryover card slides from where it just was.
                 proxy.setPosition(from.x, from.y);
@@ -84,8 +123,8 @@ final class Choreographer {
                         destination.x, destination.y, Theme.DEAL_DURATION, Interpolation.pow2Out)));
             } else {
                 // Fresh cards emerge from the dungeon — the depth ticker.
-                proxy.setPosition(dungeonSource.x - tile.getWidth() / 2f,
-                        dungeonSource.y - tile.getHeight() / 2f);
+                proxy.setPosition(dungeonSource.x - Theme.CARD_WIDTH / 2f,
+                        dungeonSource.y - Theme.CARD_HEIGHT / 2f);
                 proxy.setScale(0.2f);
                 proxy.getColor().a = 0f;
                 proxy.addAction(Actions.delay(delay, Actions.parallel(
@@ -97,7 +136,15 @@ final class Choreographer {
             longest = Math.max(longest, delay + Theme.DEAL_DURATION);
             slot++;
         }
-        flightLayer.addAction(Actions.delay(longest, Actions.run(this::finish)));
+        return longest;
+    }
+
+    private Table buildProxy(Card card) {
+        Table proxy = CardTiles.build(theme, card);
+        proxy.setSize(Theme.CARD_WIDTH, Theme.CARD_HEIGHT);
+        proxy.setTransform(true);
+        proxy.setOrigin(Theme.CARD_WIDTH / 2f, Theme.CARD_HEIGHT / 2f);
+        return proxy;
     }
 
     /**
