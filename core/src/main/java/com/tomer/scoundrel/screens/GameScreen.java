@@ -68,6 +68,9 @@ public final class GameScreen extends ScreenAdapter {
     private final Choreographer choreographer;
     private final Map<Card, Table> roomTiles = new LinkedHashMap<>();
     private Actor tickerTicks;
+    private Table hpBar;
+    private Image hpFill;
+    private Label hpNumber;
     private GameState state;
     private RunRecorder recorder;
     private String endBestLine;
@@ -202,7 +205,8 @@ public final class GameScreen extends ScreenAdapter {
         Table group = new Table();
         group.add(label("HP", theme.bodyBold, Theme.BONE)).padRight(8);
         group.add(healthBar()).width(160).height(14).padRight(8);
-        group.add(label(String.valueOf(state.health()), theme.bodyBold, Theme.BONE));
+        hpNumber = label(String.valueOf(state.health()), theme.bodyBold, Theme.BONE);
+        group.add(hpNumber);
         return group;
     }
 
@@ -210,11 +214,33 @@ public final class GameScreen extends ScreenAdapter {
     private Actor healthBar() {
         float fraction = Math.max(0f, Math.min(1f, state.health() / (float) rules.healthCap()));
         Color fill = new Color(Theme.DRIED_BLOOD).lerp(Theme.BONE, fraction);
-        Table bar = new Table();
-        bar.setBackground(theme.solid(Theme.STONE));
-        bar.left().pad(2);
-        bar.add(new Image(theme.solid(fill))).width(156 * fraction).height(10);
-        return bar;
+        hpBar = new Table();
+        hpBar.setBackground(theme.solid(Theme.STONE));
+        hpBar.left().pad(2);
+        hpFill = new Image(theme.solid(fill));
+        hpBar.add(hpFill).width(156 * fraction).height(10);
+        return hpBar;
+    }
+
+    /** Damage: the bar shudders and the number flashes dried blood. */
+    private void pulseDamage() {
+        hpBar.addAction(Actions.sequence(
+                Actions.moveBy(5, 0, 0.04f),
+                Actions.moveBy(-10, 0, 0.07f),
+                Actions.moveBy(8, 0, 0.05f),
+                Actions.moveBy(-3, 0, 0.04f)));
+        hpNumber.addAction(Actions.sequence(
+                Actions.color(new Color(Theme.DRIED_BLOOD), 0.05f),
+                Actions.color(Color.WHITE, 0.5f)));
+    }
+
+    /** Healing: the fill glows back in and the number flashes herbal. */
+    private void pulseHeal() {
+        hpFill.getColor().a = 0.35f;
+        hpFill.addAction(Actions.alpha(1f, 0.45f));
+        hpNumber.addAction(Actions.sequence(
+                Actions.color(new Color(Theme.HERBAL), 0.05f),
+                Actions.color(Color.WHITE, 0.5f)));
     }
 
     /**
@@ -372,6 +398,19 @@ public final class GameScreen extends ScreenAdapter {
         Map<String, Vector2> previousSlots = captureRoomSlots();
         rebuild();
         if (state.status() == Status.IN_PROGRESS) {
+            int damage = result.events().stream()
+                    .filter(e -> e instanceof GameEvent.MonsterDefeated)
+                    .mapToInt(e -> ((GameEvent.MonsterDefeated) e).damageTaken())
+                    .sum();
+            int healed = result.events().stream()
+                    .filter(e -> e instanceof GameEvent.PotionUsed)
+                    .mapToInt(e -> ((GameEvent.PotionUsed) e).healed())
+                    .sum();
+            if (damage > 0) {
+                pulseDamage();
+            } else if (healed > 0) {
+                pulseHeal();
+            }
             List<Card> avoided = result.events().stream()
                     .filter(e -> e instanceof GameEvent.RoomAvoided)
                     .map(e -> ((GameEvent.RoomAvoided) e).room())
