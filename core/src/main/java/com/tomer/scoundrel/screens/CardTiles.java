@@ -1,6 +1,7 @@
 package com.tomer.scoundrel.screens;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.tomer.scoundrel.model.Card;
@@ -23,6 +24,7 @@ final class CardTiles {
         Color background = roleColor(card.type());
         Color text = card.type() == CardType.WEAPON ? Theme.SOOT : Theme.BONE;
         Table tile = new Table();
+        makeWholeFaceHittable(tile);
         tile.setBackground(theme.solid(background));
         tile.add(label(card.type().name(), theme.small, dim(text, 0.7f))).padTop(12);
         tile.row();
@@ -30,6 +32,16 @@ final class CardTiles {
         tile.row();
         tile.add(corner(theme, card, text)).right().padRight(12).padBottom(10);
         return tile;
+    }
+
+    /**
+     * Scene2D's {@link Table} defaults to {@link Touchable#childrenOnly}, so a
+     * table is never itself a hit target — only its children are. Left alone, a
+     * card would only respond where a label's glyphs happen to cover the pixel,
+     * and presses anywhere else on its face would silently vanish.
+     */
+    static void makeWholeFaceHittable(com.badlogic.gdx.scenes.scene2d.Actor tile) {
+        tile.setTouchable(Touchable.enabled);
     }
 
     static Color roleColor(CardType type) {

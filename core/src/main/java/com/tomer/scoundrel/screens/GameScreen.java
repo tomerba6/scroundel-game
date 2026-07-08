@@ -6,7 +6,6 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Group;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
@@ -16,7 +15,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.VerticalGroup;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
-import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.tomer.scoundrel.ScoundrelGame;
@@ -153,6 +151,9 @@ public final class GameScreen extends ScreenAdapter {
         boolean won = state.status() == Status.WON;
         Table overlay = new Table();
         overlay.setFillParent(true);
+        // A Table is childrenOnly by default, which would let presses fall
+        // straight through to the dead board behind it.
+        overlay.setTouchable(Touchable.enabled);
         overlay.setBackground(theme.solid(dim(Theme.SOOT, 0.85f)));
         overlay.add(label(won ? "DUNGEON CLEARED" : "DEFEATED",
                 theme.title, won ? Theme.TORCHLIGHT : Theme.DRIED_BLOOD)).padBottom(4);
@@ -331,23 +332,30 @@ public final class GameScreen extends ScreenAdapter {
         }
     }
 
-    /** Small button stack over the clicked card; clicking elsewhere dismisses. */
+    /**
+     * Button stack over the pressed card. A press outside it dismisses the
+     * chooser AND resolves whatever card it landed on, so the press is never
+     * spent merely closing the popup. The popup carries no padding, so its
+     * whole area is button: a press inside it can neither fall through to the
+     * catcher (which would just re-open the chooser) nor land on inert frame.
+     */
     private void showChooser(List<Move> moves, Actor tile) {
         Group overlay = new Group();
+        overlay.setName("chooserOverlay");
         Actor catcher = new Actor();
+        catcher.setName("chooserCatcher");
         catcher.setBounds(0, 0, Theme.WORLD_WIDTH, Theme.WORLD_HEIGHT);
-        catcher.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                overlay.remove();
-            }
-        });
+        catcher.addListener(Widgets.pressListenerAt((stageX, stageY) -> {
+            overlay.remove();
+            resolveCardAt(stageX, stageY);
+        }));
         overlay.addActor(catcher);
 
         Table popup = new Table();
+        popup.setName("chooserPopup");
         popup.setBackground(theme.solid(Theme.STONE));
-        popup.pad(8);
-        popup.defaults().growX().space(6);
+        popup.pad(0);
+        popup.defaults().growX().space(0);
         for (Move move : moves) {
             TextButton button = torchButton(theme, moveLabel(move));
             // Press, like the cards: the chooser sits on the hot path for every

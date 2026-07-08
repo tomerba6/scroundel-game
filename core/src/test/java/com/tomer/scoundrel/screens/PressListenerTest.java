@@ -55,4 +55,28 @@ class PressListenerTest {
         assertFalse(listener.touchDown(new InputEvent(), 5, 5, 0, Input.Buttons.MIDDLE));
         assertEquals(0, presses.get());
     }
+
+    /** The gate and the chooser's catcher need to know where the press landed. */
+    @Test
+    void pressListenerAtReportsStageCoordinates() {
+        float[] seen = {-1, -1};
+        InputListener listener = Widgets.pressListenerAt((x, y) -> {
+            seen[0] = x;
+            seen[1] = y;
+        });
+        InputEvent event = new InputEvent();
+        event.setStageX(349);
+        event.setStageY(376);
+        assertTrue(listener.touchDown(event, 12, 34, 0, Input.Buttons.LEFT));
+        assertEquals(349, seen[0]);
+        assertEquals(376, seen[1]);
+    }
+
+    @Test
+    void pressListenerAtIgnoresNonLeftButtons() {
+        float[] seen = {-1, -1};
+        InputListener listener = Widgets.pressListenerAt((x, y) -> seen[0] = x);
+        assertFalse(listener.touchDown(new InputEvent(), 5, 5, 0, Input.Buttons.RIGHT));
+        assertEquals(-1, seen[0]);
+    }
 }

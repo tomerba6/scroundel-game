@@ -1,12 +1,9 @@
 package com.tomer.scoundrel.screens;
 
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Group;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
-import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
@@ -46,22 +43,15 @@ final class Choreographer {
         this.stage = stage;
         this.theme = theme;
         this.skipListener = skipListener;
+        gate.setName("animationGate");
+        flightLayer.setName("flightLayer");
         flightLayer.setTouchable(Touchable.disabled);
         // Press, not click, and the press coordinates: the mouse may already be
         // travelling by the time the button comes back up.
-        gate.addListener(new InputListener() {
-            @Override
-            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                if (button != Input.Buttons.LEFT) {
-                    return false;
-                }
-                float stageX = event.getStageX();
-                float stageY = event.getStageY();
-                finish(); // reveals the real tiles before we act on them
-                skipListener.skippedAt(stageX, stageY);
-                return true;
-            }
-        });
+        gate.addListener(Widgets.pressListenerAt((stageX, stageY) -> {
+            finish(); // reveals the real tiles before we act on them
+            skipListener.skippedAt(stageX, stageY);
+        }));
     }
 
     boolean isPlaying() {

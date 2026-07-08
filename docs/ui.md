@@ -20,12 +20,22 @@ in sync with the code.
 - **Input: press-then-pick.** A card with one legal move plays immediately; a
   monster with both fight options pops a small two-button chooser at the card.
   Avoid is a HUD button.
-- **Cards, chooser buttons, and the animation gate act on _press_, not click**
-  (`Widgets.pressListener`). Scene2D's `ClickListener` only fires when the
-  release lands back on the same actor, so fast play — where the mouse is
-  already travelling to the next card as the button comes up — silently lost
-  clicks. Real buttons (Avoid, New game, Records) keep release semantics, so a
-  press can still be cancelled by sliding off.
+- **A press must never be swallowed.** This UI's recurring bug. Two Scene2D
+  traps caused it, both fixed and both worth remembering:
+  1. **`Table` defaults to `Touchable.childrenOnly`** — the table itself is
+     never a hit target, only its children are. A card tile is a Table, so
+     only its *label glyphs* were clickable and presses on the blank part of a
+     card vanished into the stage. `CardTiles.makeWholeFaceHittable` sets
+     `Touchable.enabled`; `CardTileHitAreaTest` pins it. The same trap made
+     the end overlay non-modal (presses fell through to the dead board), so it
+     is explicitly `enabled` too. Any full-screen or overlapping actor needs a
+     deliberate `Touchable` decision.
+  2. **Cards, chooser buttons, and the animation gate act on _press_, not
+     click** (`Widgets.pressListener`). Scene2D's `ClickListener` only fires
+     when the release lands back on the same actor, so fast play — where the
+     mouse is already travelling to the next card as the button comes up —
+     silently lost clicks. Real buttons (Avoid, New game, Records) keep
+     release semantics, so a press can still be cancelled by sliding off.
 - **Event log: fading feed.** The last few events float top-right and fade;
   no permanent log panel.
 - **Flow (revised 2026-07-07):** launch lands on a tiny **title screen** —
@@ -113,8 +123,9 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
 - **Three stage layers with distinct lifetimes:** the root board table
   (cleared per rebuild), the feed anchor (persistent, `Touchable.disabled` so
   it never steals clicks), and transient overlays (chooser, end screen) on
-  top. The end overlay is modal by construction — fill-parent with a
-  background swallows input to the dead board.
+  top. The end overlay is modal because it is fill-parent **and explicitly
+  `Touchable.enabled`** — a background alone does not block input, since a
+  Table is `childrenOnly` by default.
 - **Events feed the feed; state feeds everything else.** `MoveResult.events`
   are consumed once for feed lines; persistent widgets render from state.
   `RoomDealt` and `GameWon/Lost` are filtered (board and overlay own those
@@ -136,9 +147,11 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
 - **Room row** — up to four typed tiles: type label, display-font value,
   rank + suit index bottom-right. Weapon tiles use soot text on iron for
   contrast; monster/potion tiles use bone.
-- **Chooser** — stone popup over the clicked card with one torchlight button
-  per legal move ("Use weapon" / "Barehanded"); clicking anywhere else
-  dismisses. Generic: a future card offering three moves gets three buttons.
+- **Chooser** — stone popup over the pressed card with one torchlight button
+  per legal move ("Use weapon" / "Barehanded"). Generic: a future card
+  offering three moves gets three buttons. It carries no padding, so its whole
+  area is button; a press *outside* it dismisses the chooser **and** resolves
+  the card it landed on, so the press is never spent merely closing the popup.
 - **Trophy rail** (bottom-left) — equipped weapon mini-tile, slain-monster
   chips in kill order, and the threshold plate: `slays anything` (fresh),
   `slays < N`, or `spent` (slew a 2). Reads `Barehanded` when nothing is

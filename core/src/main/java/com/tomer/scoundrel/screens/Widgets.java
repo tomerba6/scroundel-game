@@ -23,13 +23,24 @@ final class Widgets {
      * can still be cancelled by sliding off.
      */
     static InputListener pressListener(Runnable onPress) {
+        return pressListenerAt((stageX, stageY) -> onPress.run());
+    }
+
+    /** Told where the press landed, in stage coordinates. */
+    @FunctionalInterface
+    interface PressAt {
+        void at(float stageX, float stageY);
+    }
+
+    /** As {@link #pressListener}, for presses whose location matters. */
+    static InputListener pressListenerAt(PressAt onPress) {
         return new InputListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
                 if (button != Input.Buttons.LEFT) {
                     return false;
                 }
-                onPress.run();
+                onPress.at(event.getStageX(), event.getStageY());
                 return true;
             }
         };
