@@ -232,7 +232,8 @@ The design opens exactly the seams the named future features require, and no mor
 - **Achievements and stats:** observe the `GameEvent` stream live and keep
   persisted aggregate totals — both outside the core. Lifetime totals are sums
   over the per-run counters already persisted in the run log, so no second
-  recording system is needed.
+  recording system is needed. Stats are implemented: `RunTotals.of(runs)`.
+  Achievements are not yet built.
 - **High scores:** implemented — the `runs` package records every finished game
   (the engine remains unaware of it); `HighScores` derives the table from the log.
 

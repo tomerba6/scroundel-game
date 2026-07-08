@@ -341,9 +341,7 @@ public final class GameScreen extends ScreenAdapter {
      */
     private void showChooser(List<Move> moves, Actor tile) {
         Group overlay = new Group();
-        overlay.setName("chooserOverlay");
         Actor catcher = new Actor();
-        catcher.setName("chooserCatcher");
         catcher.setBounds(0, 0, Theme.WORLD_WIDTH, Theme.WORLD_HEIGHT);
         catcher.addListener(Widgets.pressListenerAt((stageX, stageY) -> {
             overlay.remove();
@@ -352,7 +350,6 @@ public final class GameScreen extends ScreenAdapter {
         overlay.addActor(catcher);
 
         Table popup = new Table();
-        popup.setName("chooserPopup");
         popup.setBackground(theme.solid(Theme.STONE));
         popup.pad(0);
         popup.defaults().growX().space(0);

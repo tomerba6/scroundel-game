@@ -1,6 +1,7 @@
 package com.tomer.scoundrel.screens;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -40,7 +41,7 @@ final class CardTiles {
      * card would only respond where a label's glyphs happen to cover the pixel,
      * and presses anywhere else on its face would silently vanish.
      */
-    static void makeWholeFaceHittable(com.badlogic.gdx.scenes.scene2d.Actor tile) {
+    static void makeWholeFaceHittable(Actor tile) {
         tile.setTouchable(Touchable.enabled);
     }
 

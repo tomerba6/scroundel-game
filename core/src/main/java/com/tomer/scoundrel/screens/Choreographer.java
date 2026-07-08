@@ -43,8 +43,6 @@ final class Choreographer {
         this.stage = stage;
         this.theme = theme;
         this.skipListener = skipListener;
-        gate.setName("animationGate");
-        flightLayer.setName("flightLayer");
         flightLayer.setTouchable(Touchable.disabled);
         // Press, not click, and the press coordinates: the mouse may already be
         // travelling by the time the button comes back up.

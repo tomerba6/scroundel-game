@@ -7,9 +7,9 @@ in sync with the code.
 
 > **This is not the final look.** The current UI is the deliberate *plain*
 > version: flat color tiles, drawn suit shapes, text everywhere. Card art,
-> sprites, and animations are a later pass — the layout, theme seams, and
-> interaction model below were built so that pass swaps assets and adds motion
-> without rewriting screen logic.
+> sprites, and ambient atmosphere are a later pass — the layout, theme seams,
+> and interaction model below were built so that pass swaps assets without
+> rewriting screen logic. Motion already ships (see `Choreographer`).
 
 ## Locked decisions (from the design interview)
 
@@ -189,9 +189,14 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
 - `core/src/main/java/com/tomer/scoundrel/screens/TitleScreen.java` /
   `RecordsScreen.java` — the navigation anchor and THE LEDGER.
 - `core/src/main/java/com/tomer/scoundrel/screens/CardTiles.java` /
-  `Widgets.java` — shared tile, label, and button builders.
-- `core/src/main/java/com/tomer/scoundrel/ScoundrelGame.java` — creates the
-  Theme, boots into `GameScreen`, owns disposal.
+  `Widgets.java` — shared tile, label and button builders, plus
+  `pressListener` (the press-not-click input rule) and
+  `makeWholeFaceHittable` (the `Touchable` rule).
+- `core/src/main/java/com/tomer/scoundrel/screens/Motion.java` /
+  `CardHitRegions.java` — the pure, headlessly-tested parts of the motion and
+  skip-and-act logic.
+- `core/src/main/java/com/tomer/scoundrel/ScoundrelGame.java` — the navigator:
+  creates the Theme and RunLog, boots into `TitleScreen`, owns disposal.
 - `lwjgl3` launcher — 1280×720 window, title "Scoundrel".
 - `assets/fonts/` — the two typefaces plus OFL license texts.
 
