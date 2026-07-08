@@ -17,9 +17,15 @@ in sync with the code.
   strips top and bottom. No sidebar.
 - **Cards: typed tiles.** Role-colored (monster/weapon/potion), big value,
   small rank + suit index in the corner.
-- **Input: click-then-pick.** A card with one legal move plays immediately on
-  click; a monster with both fight options pops a small two-button chooser at
-  the card. Avoid is a HUD button.
+- **Input: press-then-pick.** A card with one legal move plays immediately; a
+  monster with both fight options pops a small two-button chooser at the card.
+  Avoid is a HUD button.
+- **Cards, chooser buttons, and the animation gate act on _press_, not click**
+  (`Widgets.pressListener`). Scene2D's `ClickListener` only fires when the
+  release lands back on the same actor, so fast play — where the mouse is
+  already travelling to the next card as the button comes up — silently lost
+  clicks. Real buttons (Avoid, New game, Records) keep release semantics, so a
+  press can still be cancelled by sliding off.
 - **Event log: fading feed.** The last few events float top-right and fade;
   no permanent log panel.
 - **Flow (revised 2026-07-07):** launch lands on a tiny **title screen** —
@@ -72,10 +78,16 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
   replay the transition above it: dealt cards fly out of the depth ticker
   (the dungeon made physical), the carryover card slides from its old slot,
   and an avoided room sweeps up into the ticker before the next deal.
-  Animations are **blocking but skippable**: a fullscreen gate holds input
-  while one plays, and any click cuts straight to the settled board — always
-  safe, because nothing mid-flight carries game state. Durations, stagger,
-  and card size are `Theme` tokens. Locked motion set, both shipped:
+  Animations are **blocking but skippable, and no click is ever wasted**: a
+  fullscreen gate holds input while one plays, and a press on it settles the
+  board *and* resolves the card it landed on (`Choreographer.SkipListener` →
+  `GameScreen.resolveCardAt`). Always safe, because nothing mid-flight carries
+  game state. Durations, stagger, and card size are `Theme` tokens, kept short
+  on purpose — the gate covers the whole deal, so a long animation reads as
+  dropped clicks (`Motion.dealWindow` pins that span: 0.30s deal, 0.50s after
+  an avoid). The pure parts — the window arithmetic and the "which card is
+  under this point" lookup — live in `Motion` and `CardHitRegions` so they are
+  unit tested headlessly. Locked motion set, both shipped:
   traveling cards (deal-in + avoid sweep) and feedback pulses (damage
   shudders the HP bar and flashes the number dried blood; healing glows the
   fill back in, herbal). No reveals or ambient effects yet.

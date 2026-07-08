@@ -36,6 +36,7 @@ import com.tomer.scoundrel.runs.RunLog;
 import com.tomer.scoundrel.runs.RunRecorder;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -83,7 +84,7 @@ public final class GameScreen extends ScreenAdapter {
         this.rules = Rulesets.standard();
         this.engine = new ScoundrelEngine(rules);
         this.stage = new Stage(new FitViewport(Theme.WORLD_WIDTH, Theme.WORLD_HEIGHT));
-        this.choreographer = new Choreographer(stage, theme);
+        this.choreographer = new Choreographer(stage, theme, this::resolveCardAt);
         startRun();
 
         root.setFillParent(true);
@@ -292,13 +293,30 @@ public final class GameScreen extends ScreenAdapter {
     private Actor cardTile(Card card) {
         Table tile = CardTiles.build(theme, card);
         roomTiles.put(card, tile);
-        tile.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                onCardClicked(card, tile);
-            }
-        });
+        // Press, not click: fast play releases the button mid-travel.
+        tile.addListener(Widgets.pressListener(() -> onCardClicked(card, tile)));
         return tile;
+    }
+
+    /**
+     * A click that skipped an animation also resolves the card it landed on,
+     * so no click is ever spent purely on dismissing the motion. The board is
+     * already settled and laid out by the time this runs.
+     */
+    private void resolveCardAt(float stageX, float stageY) {
+        if (state.status() != Status.IN_PROGRESS) {
+            return;
+        }
+        List<CardHitRegions.CardRect> rects = new ArrayList<>();
+        roomTiles.forEach((card, tile) -> {
+            Vector2 corner = tile.localToStageCoordinates(new Vector2(0, 0));
+            rects.add(new CardHitRegions.CardRect(card, corner.x, corner.y,
+                    tile.getWidth(), tile.getHeight()));
+        });
+        Card card = CardHitRegions.cardAt(rects, stageX, stageY);
+        if (card != null) {
+            onCardClicked(card, roomTiles.get(card));
+        }
     }
 
     /** One legal move plays immediately; two or more open the chooser. */
@@ -332,13 +350,12 @@ public final class GameScreen extends ScreenAdapter {
         popup.defaults().growX().space(6);
         for (Move move : moves) {
             TextButton button = torchButton(theme, moveLabel(move));
-            button.addListener(new ChangeListener() {
-                @Override
-                public void changed(ChangeEvent event, Actor actor) {
-                    overlay.remove();
-                    applyMove(move);
-                }
-            });
+            // Press, like the cards: the chooser sits on the hot path for every
+            // armed monster, so it must not drop a fast click either.
+            button.addListener(Widgets.pressListener(() -> {
+                overlay.remove();
+                applyMove(move);
+            }));
             popup.add(button);
             popup.row();
         }

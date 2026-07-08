@@ -1,15 +1,16 @@
 package com.tomer.scoundrel.screens;
 
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Group;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
-import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.tomer.scoundrel.model.Card;
 
 import java.util.ArrayList;
@@ -20,26 +21,45 @@ import java.util.Map;
  * Plays purely cosmetic move animations over the already-rebuilt board. The
  * state underneath is final before any motion starts, so skipping is always
  * safe: {@link #finish()} just discards the flight proxies and reveals the
- * real tiles. While a choreography plays, a fullscreen gate blocks the board
- * and any click skips.
+ * real tiles. While a choreography plays, a fullscreen gate covers the board;
+ * a click on it settles the board immediately AND is handed to the
+ * {@link SkipListener}, so the same click still resolves the card it landed
+ * on — no click is ever wasted.
  */
 final class Choreographer {
 
+    /** Told where a skip-click landed, once the board is settled. */
+    @FunctionalInterface
+    interface SkipListener {
+        void skippedAt(float stageX, float stageY);
+    }
+
     private final Stage stage;
     private final Theme theme;
+    private final SkipListener skipListener;
     private final Group flightLayer = new Group();
     private final Actor gate = new Actor();
     private final List<Actor> hiddenTiles = new ArrayList<>();
     private boolean playing;
 
-    Choreographer(Stage stage, Theme theme) {
+    Choreographer(Stage stage, Theme theme, SkipListener skipListener) {
         this.stage = stage;
         this.theme = theme;
+        this.skipListener = skipListener;
         flightLayer.setTouchable(Touchable.disabled);
-        gate.addListener(new ClickListener() {
+        // Press, not click, and the press coordinates: the mouse may already be
+        // travelling by the time the button comes back up.
+        gate.addListener(new InputListener() {
             @Override
-            public void clicked(InputEvent event, float x, float y) {
-                finish();
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                if (button != Input.Buttons.LEFT) {
+                    return false;
+                }
+                float stageX = event.getStageX();
+                float stageY = event.getStageY();
+                finish(); // reveals the real tiles before we act on them
+                skipListener.skippedAt(stageX, stageY);
+                return true;
             }
         });
     }
@@ -103,7 +123,6 @@ final class Choreographer {
      */
     private float spawnDealProxies(Map<Card, Table> roomTiles, Map<String, Vector2> previousSlots,
                                    Vector2 dungeonSource, float baseDelay) {
-        float longest = baseDelay;
         int slot = 0;
         for (Map.Entry<Card, Table> entry : roomTiles.entrySet()) {
             Card card = entry.getKey();
@@ -133,10 +152,10 @@ final class Choreographer {
                         Actions.fadeIn(Theme.DEAL_DURATION * 0.6f))));
             }
             flightLayer.addActor(proxy);
-            longest = Math.max(longest, delay + Theme.DEAL_DURATION);
             slot++;
         }
-        return longest;
+        return Motion.dealWindow(roomTiles.size(), baseDelay,
+                Theme.DEAL_STAGGER, Theme.DEAL_DURATION);
     }
 
     private Table buildProxy(Card card) {

@@ -1,7 +1,10 @@
 package com.tomer.scoundrel.screens;
 
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 
@@ -9,6 +12,27 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 final class Widgets {
 
     private Widgets() {
+    }
+
+    /**
+     * Acts the instant the left button goes down. Scene2D's {@code
+     * ClickListener} only fires when the release lands back on the same actor,
+     * so a click made while the mouse is already travelling to the next card —
+     * exactly what fast play looks like — is silently discarded. Cards use
+     * this instead; buttons keep the conventional release semantics so a press
+     * can still be cancelled by sliding off.
+     */
+    static InputListener pressListener(Runnable onPress) {
+        return new InputListener() {
+            @Override
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                if (button != Input.Buttons.LEFT) {
+                    return false;
+                }
+                onPress.run();
+                return true;
+            }
+        };
     }
 
     static Label label(String text, BitmapFont font, Color color) {

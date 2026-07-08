@@ -36,10 +36,11 @@ public final class Theme implements Disposable {
     public static final float WORLD_WIDTH = 1280;
     public static final float WORLD_HEIGHT = 720;
 
-    // Motion tokens (seconds) — the art pass tunes these in one place.
-    public static final float DEAL_DURATION = 0.28f;
-    public static final float DEAL_STAGGER = 0.07f;
-    public static final float SWEEP_DURATION = 0.30f;
+    // Motion tokens (seconds) — the art pass tunes these in one place. Kept
+    // short because the input gate stays up for the whole deal (see Motion).
+    public static final float DEAL_DURATION = 0.18f;
+    public static final float DEAL_STAGGER = 0.04f;
+    public static final float SWEEP_DURATION = 0.20f;
 
     // Card tile size (virtual pixels), shared by the board layout and flight proxies.
     public static final float CARD_WIDTH = 170;
