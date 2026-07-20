@@ -5,6 +5,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,23 @@ public final class RunLog {
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
             throw new UncheckedIOException("could not append run to " + file, e);
+        }
+    }
+
+    /**
+     * Erases the history by moving the file aside to a {@code .bak} sibling
+     * (overwriting any earlier backup), so an accidental reset stays
+     * recoverable from disk; the game never restores it automatically. A no-op
+     * when nothing has been written yet.
+     */
+    public void clear() {
+        try {
+            if (Files.exists(file)) {
+                Path backup = file.resolveSibling(file.getFileName().toString() + ".bak");
+                Files.move(file, backup, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("could not clear " + file, e);
         }
     }
 

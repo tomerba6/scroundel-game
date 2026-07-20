@@ -78,4 +78,35 @@ class RunLogTest {
         Files.writeString(file, unixWritten.toLine() + "\n" + windowsWritten.toLine() + "\r\n");
         assertEquals(List.of(unixWritten, windowsWritten), new RunLog(file).readAll());
     }
+
+    @Test
+    void clearMovesTheLogAsideToARecoverableBackupAndEmptiesIt() {
+        Path file = dir.resolve("runs.log");
+        RunLog log = new RunLog(file);
+        RunRecord record = run(20, "2026-07-06T10:00:00Z");
+        log.append(record);
+        log.clear();
+        assertEquals(List.of(), log.readAll());
+        Path backup = dir.resolve("runs.log.bak");
+        assertTrue(Files.exists(backup), "a backup must be kept");
+        assertEquals(List.of(record), new RunLog(backup).readAll());
+    }
+
+    @Test
+    void clearWithoutAFileIsANoOp() {
+        RunLog log = new RunLog(dir.resolve("runs.log"));
+        log.clear();
+        assertEquals(List.of(), log.readAll());
+    }
+
+    @Test
+    void clearOverwritesAnyPriorBackup() {
+        RunLog log = new RunLog(dir.resolve("runs.log"));
+        log.append(run(5, "2026-07-06T10:00:00Z"));
+        log.clear();
+        RunRecord later = run(9, "2026-07-07T10:00:00Z");
+        log.append(later);
+        log.clear();
+        assertEquals(List.of(later), new RunLog(dir.resolve("runs.log.bak")).readAll());
+    }
 }
