@@ -8,6 +8,7 @@ import com.tomer.scoundrel.screens.GameScreen;
 import com.tomer.scoundrel.screens.RecordsScreen;
 import com.tomer.scoundrel.screens.Theme;
 import com.tomer.scoundrel.screens.TitleScreen;
+import com.tomer.scoundrel.screens.TrophiesScreen;
 
 import java.nio.file.Path;
 
@@ -41,6 +42,10 @@ public class ScoundrelGame extends Game {
 
     public void showRecords() {
         switchTo(new RecordsScreen(this, theme, runLog));
+    }
+
+    public void showTrophies() {
+        switchTo(new TrophiesScreen(this, theme, achievements));
     }
 
     /** setScreen only hides the previous screen; it must also be disposed. */
