@@ -41,7 +41,7 @@ public class ScoundrelGame extends Game {
     }
 
     public void showRecords() {
-        switchTo(new RecordsScreen(this, theme, runLog));
+        switchTo(new RecordsScreen(this, theme, runLog, achievements));
     }
 
     public void showTrophies() {
