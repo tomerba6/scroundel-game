@@ -79,4 +79,25 @@ class AchievementStoreTest {
         assertThrows(UncheckedIOException.class,
                 () -> store.append(unlock("first_blood", "2026-07-10T10:00:00Z")));
     }
+
+    @Test
+    void clearMovesTheLogAsideToARecoverableBackupAndEmptiesIt() {
+        Path file = dir.resolve("achievements.log");
+        AchievementStore store = new AchievementStore(file);
+        UnlockedAchievement earned = unlock("first_blood", "2026-07-10T10:00:00Z");
+        store.append(earned);
+        store.clear();
+        assertEquals(List.of(), store.readAll());
+        assertEquals(Set.of(), store.unlockedIds());
+        Path backup = dir.resolve("achievements.log.bak");
+        assertTrue(Files.exists(backup), "a backup must be kept");
+        assertEquals(List.of(earned), new AchievementStore(backup).readAll());
+    }
+
+    @Test
+    void clearWithoutAFileIsANoOp() {
+        AchievementStore store = new AchievementStore(dir.resolve("achievements.log"));
+        store.clear();
+        assertEquals(List.of(), store.readAll());
+    }
 }

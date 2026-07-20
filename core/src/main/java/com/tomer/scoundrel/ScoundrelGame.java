@@ -41,11 +41,21 @@ public class ScoundrelGame extends Game {
     }
 
     public void showRecords() {
-        switchTo(new RecordsScreen(this, theme, runLog));
+        switchTo(new RecordsScreen(this, theme, runLog, achievements));
     }
 
     public void showTrophies() {
         switchTo(new TrophiesScreen(this, theme, achievements));
+    }
+
+    /**
+     * Wipes all recorded runs and earned achievements. Both files are moved
+     * aside to recoverable {@code .bak} backups rather than deleted. Guarded in
+     * the UI behind a confirmation; callers own that safety step.
+     */
+    public void eraseAllProgress() {
+        runLog.clear();
+        achievements.clear();
     }
 
     /** setScreen only hides the previous screen; it must also be disposed. */

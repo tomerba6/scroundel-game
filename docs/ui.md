@@ -185,7 +185,18 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
   negative), outcome, date, duration, monsters slain, hairline rules between
   rows. Beside it, lifetime totals headed `ACROSS N FINISHED RUNS` (the
   label encodes the quit-runs decision: finished games are the whole
-  universe). Empty state invites a first run; Back returns to the title.
+  universe). Empty state invites a first run. Back returns to the title; a
+  quiet **Erase all progress** sits opposite it, bottom-right (disabled when
+  there is nothing to lose).
+- **Erase-progress confirmation** — a destructive reset is never one click. The
+  Erase control (records screen only — deliberately the one such button in the
+  whole app) opens a modal that names exactly what will be lost (`all N recorded
+  runs and M trophies`), with **Keep it** — the prominent torchlight default —
+  and a dried-blood **Erase everything**; both keep release semantics, so a
+  stray press can slide off and cancel. Confirming wipes both logs as a *soft*
+  delete: `RunLog`/`AchievementStore` `clear()` moves each file to a `.bak`
+  sibling rather than deleting, so a mistake is recoverable from disk (the game
+  never auto-restores it). The ledger then re-shows empty.
 - **TROPHIES (achievements screen)** — the whole catalog as a book of deeds,
   headed by an `N of 10 earned` count. One hairline-ruled row per achievement:
   title (torchlight when earned, dim when locked), the deed described, and the

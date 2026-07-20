@@ -235,7 +235,9 @@ thing persisted is the *unlocked latch* — `AchievementStore` appends
 schema as the run log. Progress toward a milestone is never stored — it is
 derived from the run log on demand, keeping the run history the single source of
 truth. The layering is strictly outward: `achievements` may read `runs` and the
-core, never the reverse.
+core, never the reverse. Both `RunLog` and `AchievementStore` also expose a
+recoverable `clear()` — a *soft* delete that moves the file aside to a `.bak`
+sibling rather than erasing it — behind the UI's guarded progress-reset.
 
 ### Extension seams
 

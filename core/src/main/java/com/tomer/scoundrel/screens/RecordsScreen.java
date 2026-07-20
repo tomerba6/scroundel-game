@@ -4,6 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -11,6 +12,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.tomer.scoundrel.ScoundrelGame;
+import com.tomer.scoundrel.achievements.AchievementStore;
 import com.tomer.scoundrel.model.Status;
 import com.tomer.scoundrel.runs.HighScores;
 import com.tomer.scoundrel.runs.RunLog;
@@ -22,8 +24,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 
+import static com.tomer.scoundrel.screens.Widgets.dangerButton;
 import static com.tomer.scoundrel.screens.Widgets.dim;
 import static com.tomer.scoundrel.screens.Widgets.label;
+import static com.tomer.scoundrel.screens.Widgets.mutedButton;
 import static com.tomer.scoundrel.screens.Widgets.torchButton;
 
 /**
@@ -38,11 +42,17 @@ public final class RecordsScreen extends ScreenAdapter {
     private static final DateTimeFormatter DAY =
             DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH).withZone(ZoneId.systemDefault());
 
+    private final ScoundrelGame game;
+    private final Theme theme;
     private final Stage stage;
 
-    public RecordsScreen(ScoundrelGame game, Theme theme, RunLog runLog) {
+    public RecordsScreen(ScoundrelGame game, Theme theme, RunLog runLog, AchievementStore achievements) {
+        this.game = game;
+        this.theme = theme;
         stage = new Stage(new FitViewport(Theme.WORLD_WIDTH, Theme.WORLD_HEIGHT));
         List<RunRecord> records = readSafely(runLog);
+        int trophies = trophyCount(achievements);
+        boolean hasProgress = !records.isEmpty() || trophies > 0;
 
         Table root = new Table();
         root.setFillParent(true);
@@ -62,6 +72,12 @@ public final class RecordsScreen extends ScreenAdapter {
             root.add().expand().colspan(2);
             root.row();
         }
+        root.add(bottomBar(records.size(), trophies, hasProgress)).colspan(2).growX();
+    }
+
+    /** Back on the left; the quiet Erase control far right, disabled with nothing to lose. */
+    private Actor bottomBar(int runs, int trophies, boolean hasProgress) {
+        Table bar = new Table();
         TextButton back = torchButton(theme, "Back");
         back.addListener(new ChangeListener() {
             @Override
@@ -69,7 +85,78 @@ public final class RecordsScreen extends ScreenAdapter {
                 game.showTitle();
             }
         });
-        root.add(back).left().colspan(2);
+        bar.add(back).left();
+        bar.add().expandX();
+        TextButton erase = mutedButton(theme, "Erase all progress");
+        erase.setDisabled(!hasProgress);
+        if (hasProgress) {
+            erase.addListener(new ChangeListener() {
+                @Override
+                public void changed(ChangeEvent event, Actor actor) {
+                    showEraseConfirmation(runs, trophies);
+                }
+            });
+        }
+        bar.add(erase).right();
+        return bar;
+    }
+
+    /**
+     * A modal, two-button confirmation — a destructive erase must never be one
+     * click. It names exactly what will be lost, and both buttons use release
+     * semantics so a press that slides off is cancelled. "Keep it" is the
+     * prominent default; "Erase everything" wears the danger colour.
+     */
+    private void showEraseConfirmation(int runs, int trophies) {
+        Table overlay = new Table();
+        overlay.setFillParent(true);
+        // A Table is childrenOnly by default, which would let presses fall through.
+        overlay.setTouchable(Touchable.enabled);
+        overlay.setBackground(theme.solid(dim(Theme.SOOT, 0.9f)));
+
+        overlay.add(label("Erase all progress?", theme.title, Theme.DRIED_BLOOD)).padBottom(12);
+        overlay.row();
+        overlay.add(label("This clears all " + runs + " recorded " + plural(runs, "run", "runs")
+                + " and " + trophies + " " + plural(trophies, "trophy", "trophies") + ".",
+                theme.body, Theme.BONE)).padBottom(4);
+        overlay.row();
+        overlay.add(label("A backup is kept on disk, but the game will not restore it for you.",
+                theme.small, dim(Theme.BONE, 0.6f))).padBottom(28);
+        overlay.row();
+
+        Table buttons = new Table();
+        TextButton keep = torchButton(theme, "Keep it");
+        keep.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                overlay.remove();
+            }
+        });
+        buttons.add(keep).padRight(48);
+        TextButton erase = dangerButton(theme, "Erase everything");
+        erase.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                game.eraseAllProgress();
+                game.showRecords(); // rebuild, now showing the empty ledger
+            }
+        });
+        buttons.add(erase);
+        overlay.add(buttons);
+        stage.addActor(overlay);
+    }
+
+    private static String plural(int count, String one, String many) {
+        return count == 1 ? one : many;
+    }
+
+    private static int trophyCount(AchievementStore achievements) {
+        try {
+            return achievements.unlockedIds().size();
+        } catch (RuntimeException e) {
+            Gdx.app.error("scoundrel", "failed to read achievements", e);
+            return 0;
+        }
     }
 
     private static List<RunRecord> readSafely(RunLog runLog) {

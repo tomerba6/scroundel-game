@@ -68,4 +68,28 @@ final class Widgets {
         button.pad(6, 20, 6, 20);
         return button;
     }
+
+    /** A quiet, low-emphasis button — stone with dim text; won't invite a stray click. */
+    static TextButton mutedButton(Theme theme, String text) {
+        TextButton.TextButtonStyle style = new TextButton.TextButtonStyle();
+        style.font = theme.bodyBold;
+        style.up = theme.solid(Theme.STONE);
+        style.fontColor = dim(Theme.BONE, 0.55f);
+        style.disabled = theme.solid(Theme.STONE);
+        style.disabledFontColor = dim(Theme.BONE, 0.2f);
+        TextButton button = new TextButton(text, style);
+        button.pad(6, 20, 6, 20);
+        return button;
+    }
+
+    /** The danger style — dried blood; reserved for destructive confirmations. */
+    static TextButton dangerButton(Theme theme, String text) {
+        TextButton.TextButtonStyle style = new TextButton.TextButtonStyle();
+        style.font = theme.bodyBold;
+        style.up = theme.solid(Theme.DRIED_BLOOD);
+        style.fontColor = Theme.BONE;
+        TextButton button = new TextButton(text, style);
+        button.pad(6, 20, 6, 20);
+        return button;
+    }
 }
