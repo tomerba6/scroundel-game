@@ -2,9 +2,10 @@
 
 Visual reference for the pure rules engine in the `core` module
 (`com.tomer.scoundrel.model` = plain state, `com.tomer.scoundrel.rules` = logic).
-The diagrams reflect the **approved design** and the rules in
-[`../CLAUDE.md`](../CLAUDE.md); the engine is not implemented yet, so this is the
-target shape, not a description of existing code.
+The diagrams reflect the rules in [`../CLAUDE.md`](../CLAUDE.md) and the engine
+as built: the model, the rules, and their outside observers (`runs`,
+`achievements`) are all implemented and unit-tested. Keep this in sync when the
+design changes.
 
 ---
 
@@ -211,10 +212,30 @@ observe this stream from outside the core. Because events are returned rather th
 pushed through registered listeners, the core holds no references to observers and
 stays fully testable ("this move emits exactly these events").
 
-Two observers exist today, both outside the engine: the UI's fading feed, and the
+Three observers exist today, all outside the engine: the UI's fading feed; the
 `...scoundrel.runs` package — `RunRecorder` tallies each game's events and
 `RunLog` appends the finished run (seed, ruleset id, outcome, score, counters) to
-`~/.scoundrel/runs.log` as versioned, tolerantly-parsed key=value lines.
+`~/.scoundrel/runs.log` as versioned, tolerantly-parsed key=value lines — and the
+`...scoundrel.achievements` package, which reads the same stream to unlock
+achievements (next).
+
+### Achievements
+
+The `...scoundrel.achievements` package is the second event-stream observer, a
+sibling of `runs` and equally pure. An `AchievementTracker` is fed every
+`MoveResult` and distils one finished game into a `RunSummary` (outcome, score,
+final health, seconds, the bare-handed-kill facts, and whether any room was
+cleared unscathed) — richer than the persisted `RunRecord`. Each `Achievement`
+is data: an id, player-facing text, a hidden flag, and a rule over an
+`AchievementContext` (that summary plus the full run history, so milestone rules
+sum lifetime totals through `RunTotals`). `AchievementService.newlyEarned` is a
+pure function returning the catalog entries now earned but not yet held; the only
+thing persisted is the *unlocked latch* — `AchievementStore` appends
+`~/.scoundrel/achievements.log` (id + earnedAt) in the same tolerant, versioned
+schema as the run log. Progress toward a milestone is never stored — it is
+derived from the run log on demand, keeping the run history the single source of
+truth. The layering is strictly outward: `achievements` may read `runs` and the
+core, never the reverse.
 
 ### Extension seams
 
@@ -232,8 +253,10 @@ The design opens exactly the seams the named future features require, and no mor
 - **Achievements and stats:** observe the `GameEvent` stream live and keep
   persisted aggregate totals — both outside the core. Lifetime totals are sums
   over the per-run counters already persisted in the run log, so no second
-  recording system is needed. Stats are implemented: `RunTotals.of(runs)`.
-  Achievements are not yet built.
+  recording system is needed. Both are implemented: stats via
+  `RunTotals.of(runs)`, and the `...scoundrel.achievements` package (above),
+  whose milestone progress is likewise derived from the run log rather than
+  separately stored.
 - **High scores:** implemented — the `runs` package records every finished game
   (the engine remains unaware of it); `HighScores` derives the table from the log.
 

@@ -4,7 +4,7 @@ A desktop implementation of **Scoundrel**, a single-player roguelike card game, 
 
 Scoundrel is a solitaire dungeon crawl played with a trimmed deck of 44 cards. You descend through a "dungeon" of face-up cards, fighting monsters, picking up weapons, and drinking health potions, trying to survive to the bottom of the deck. It's quick, tense, and entirely a game of managing risk with the hand the shuffle deals you.
 
-> **Status:** playable. The full base game works — a pure, fully unit-tested rules engine, a plain Scene2D UI (typed card tiles, press to resolve, torchlit look), card motion, persisted high scores, and a records screen. Card art and sprites are still to come. See [Roadmap](#roadmap).
+> **Status:** playable. The full base game works — a pure, fully unit-tested rules engine, a plain Scene2D UI (typed card tiles, press to resolve, torchlit look), card motion, persisted high scores, a records screen, and achievements. Card art and sprites are still to come. See [Roadmap](#roadmap).
 
 ## How to play
 
@@ -37,7 +37,7 @@ On Windows, use `gradlew.bat` instead of `./gradlew`.
 
 This is a Gradle multi-module project. The intended split (per `CLAUDE.md`) is:
 
-- **`core`** — all game logic. The rules engine (`model` + `rules` packages) is **pure, headless Java with no libGDX dependency**, unit-tested without a window or render loop. The Scene2D screens (`screens` package) draw the state and translate presses into engine moves — no rule logic lives there. `runs` records finished games and derives high scores and lifetime totals, observing the engine from outside (also pure Java).
+- **`core`** — all game logic. The rules engine (`model` + `rules` packages) is **pure, headless Java with no libGDX dependency**, unit-tested without a window or render loop. The Scene2D screens (`screens` package) draw the state and translate presses into engine moves — no rule logic lives there. `runs` records finished games and derives high scores and lifetime totals; `achievements` evaluates and persists unlocked achievements — both pure Java, observing the engine from outside.
 - **`lwjgl3`** — a thin desktop launcher (LWJGL3). No game logic.
 
 See [`CLAUDE.md`](CLAUDE.md) for the full design rules and the complete game specification.
@@ -52,7 +52,7 @@ See [`CLAUDE.md`](CLAUDE.md) for the full design rules and the complete game spe
 - [ ] Card art, sprites, and ambient atmosphere
 - [x] High scores (persisted to `~/.scoundrel/runs.log`; best shown on the end screen)
 - [x] Lifetime stats — THE LEDGER records screen (top runs + totals over the run log)
-- [ ] Achievements (built on the engine's event stream)
+- [x] Achievements (built on the engine's event stream; earned via a TROPHIES screen)
 - [ ] Difficulty variants (alternate rulesets, no engine changes)
 
 ## Credits & acknowledgements
