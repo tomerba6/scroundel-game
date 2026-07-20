@@ -2,6 +2,7 @@ package com.tomer.scoundrel;
 
 import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Screen;
+import com.tomer.scoundrel.achievements.AchievementStore;
 import com.tomer.scoundrel.runs.RunLog;
 import com.tomer.scoundrel.screens.GameScreen;
 import com.tomer.scoundrel.screens.RecordsScreen;
@@ -12,19 +13,21 @@ import java.nio.file.Path;
 
 /**
  * {@link com.badlogic.gdx.ApplicationListener} shared by all platforms, and
- * the app's navigator: screens ask it to switch, it owns the shared Theme
- * and RunLog and disposes whichever screen is being left.
+ * the app's navigator: screens ask it to switch, it owns the shared Theme,
+ * RunLog and AchievementStore and disposes whichever screen is being left.
  */
 public class ScoundrelGame extends Game {
 
     private Theme theme;
     private RunLog runLog;
+    private AchievementStore achievements;
 
     @Override
     public void create() {
         theme = new Theme();
-        runLog = new RunLog(
-                Path.of(System.getProperty("user.home"), ".scoundrel", "runs.log"));
+        Path home = Path.of(System.getProperty("user.home"), ".scoundrel");
+        runLog = new RunLog(home.resolve("runs.log"));
+        achievements = new AchievementStore(home.resolve("achievements.log"));
         showTitle();
     }
 
@@ -33,7 +36,7 @@ public class ScoundrelGame extends Game {
     }
 
     public void showGame() {
-        switchTo(new GameScreen(this, theme, runLog));
+        switchTo(new GameScreen(this, theme, runLog, achievements));
     }
 
     public void showRecords() {

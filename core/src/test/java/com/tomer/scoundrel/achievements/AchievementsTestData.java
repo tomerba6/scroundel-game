@@ -8,7 +8,10 @@ import com.tomer.scoundrel.rules.GameEvent;
 import com.tomer.scoundrel.rules.MoveResult;
 import com.tomer.scoundrel.runs.RunRecord;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 
 /** Fixtures shared by the achievement tests. */
@@ -18,6 +21,28 @@ final class AchievementsTestData {
     static final int FULL_ROOM = 3;
 
     private AchievementsTestData() {
+    }
+
+    /** A clock that reads {@code start} first (the recorder's start) then {@code end}. */
+    static Clock advancingClock(Instant start, Instant end) {
+        return new Clock() {
+            private int calls;
+
+            @Override
+            public Instant instant() {
+                return calls++ == 0 ? start : end;
+            }
+
+            @Override
+            public ZoneId getZone() {
+                return ZoneOffset.UTC;
+            }
+
+            @Override
+            public Clock withZone(ZoneId zone) {
+                return this;
+            }
+        };
     }
 
     /** A MoveResult whose only state fact the tracker reads is health. */

@@ -18,6 +18,14 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.tomer.scoundrel.ScoundrelGame;
+import com.tomer.scoundrel.achievements.Achievement;
+import com.tomer.scoundrel.achievements.AchievementContext;
+import com.tomer.scoundrel.achievements.AchievementService;
+import com.tomer.scoundrel.achievements.AchievementStore;
+import com.tomer.scoundrel.achievements.AchievementTracker;
+import com.tomer.scoundrel.achievements.Achievements;
+import com.tomer.scoundrel.achievements.RunSummary;
+import com.tomer.scoundrel.achievements.UnlockedAchievement;
 import com.tomer.scoundrel.model.Card;
 import com.tomer.scoundrel.model.CardType;
 import com.tomer.scoundrel.model.EquippedWeapon;
@@ -31,6 +39,7 @@ import com.tomer.scoundrel.rules.Rulesets;
 import com.tomer.scoundrel.rules.ScoundrelEngine;
 import com.tomer.scoundrel.runs.HighScores;
 import com.tomer.scoundrel.runs.RunLog;
+import com.tomer.scoundrel.runs.RunRecord;
 import com.tomer.scoundrel.runs.RunRecorder;
 
 import java.time.Clock;
@@ -62,6 +71,7 @@ public final class GameScreen extends ScreenAdapter {
     private final ScoundrelEngine engine;
     private final Stage stage;
     private final RunLog runLog;
+    private final AchievementStore achievements;
     private final Table root = new Table();
     private final VerticalGroup feed = new VerticalGroup();
     private final Choreographer choreographer;
@@ -72,13 +82,16 @@ public final class GameScreen extends ScreenAdapter {
     private Label hpNumber;
     private GameState state;
     private RunRecorder recorder;
+    private AchievementTracker tracker;
     private String endBestLine;
+    private List<Achievement> newlyUnlocked = List.of();
     private Actor endOverlay;
 
-    public GameScreen(ScoundrelGame game, Theme theme, RunLog runLog) {
+    public GameScreen(ScoundrelGame game, Theme theme, RunLog runLog, AchievementStore achievements) {
         this.game = game;
         this.theme = theme;
         this.runLog = runLog;
+        this.achievements = achievements;
         this.rules = Rulesets.standard();
         this.engine = new ScoundrelEngine(rules);
         this.stage = new Stage(new FitViewport(Theme.WORLD_WIDTH, Theme.WORLD_HEIGHT));
@@ -166,6 +179,10 @@ public final class GameScreen extends ScreenAdapter {
             overlay.add(label(endBestLine, theme.bodyBold, bestColor)).padBottom(24);
             overlay.row();
         }
+        if (!newlyUnlocked.isEmpty()) {
+            overlay.add(unlockedBanner()).padBottom(24);
+            overlay.row();
+        }
         TextButton newGame = torchButton(theme, "New game");
         newGame.addListener(new ChangeListener() {
             @Override
@@ -184,6 +201,22 @@ public final class GameScreen extends ScreenAdapter {
         });
         overlay.add(records);
         return overlay;
+    }
+
+    /**
+     * The achievements this run just earned, listed under a torchlight heading.
+     * A hidden achievement is revealed here the moment it is earned — hiding
+     * only ever applies to the not-yet-earned on the trophies screen.
+     */
+    private Actor unlockedBanner() {
+        Table banner = new Table();
+        banner.add(label(newlyUnlocked.size() == 1 ? "ACHIEVEMENT UNLOCKED" : "ACHIEVEMENTS UNLOCKED",
+                theme.small, Theme.TORCHLIGHT)).padBottom(6);
+        for (Achievement earned : newlyUnlocked) {
+            banner.row();
+            banner.add(label(earned.title(), theme.bodyBold, Theme.BONE)).padBottom(2);
+        }
+        return banner;
     }
 
     private void startNewGame() {
@@ -382,19 +415,34 @@ public final class GameScreen extends ScreenAdapter {
         };
     }
 
-    /** Fresh shuffle, fresh recorder; the seed is captured for the run record. */
+    /** Fresh shuffle, fresh recorder and achievement tracker for the new run. */
     private void startRun() {
         long seed = new Random().nextLong();
         state = engine.newGame(seed);
         recorder = new RunRecorder(seed, RULESET_ID, Clock.systemUTC());
+        tracker = new AchievementTracker(rules.cardsResolvedPerTurn());
         endBestLine = null;
+        newlyUnlocked = List.of();
     }
 
-    /** Persists the finished run; a storage failure must never break play. */
-    private void recordRun() {
+    /**
+     * End of game: persist the run, then evaluate and persist achievements.
+     * Each is independently guarded — neither storage step may break play, and
+     * a failure in one must not stop the other.
+     */
+    private void finishRun() {
+        RunRecord record;
+        try {
+            record = recorder.toRecord();
+        } catch (RuntimeException e) {
+            Gdx.app.error("scoundrel", "failed to build the run record", e);
+            endBestLine = null;
+            newlyUnlocked = List.of();
+            return;
+        }
         try {
             OptionalInt bestBefore = HighScores.best(runLog.readAll());
-            runLog.append(recorder.toRecord());
+            runLog.append(record);
             endBestLine = bestBefore.isEmpty() || state.score() > bestBefore.getAsInt()
                     ? "New best!"
                     : "best " + bestBefore.getAsInt();
@@ -402,14 +450,29 @@ public final class GameScreen extends ScreenAdapter {
             Gdx.app.error("scoundrel", "failed to record the run", e);
             endBestLine = null;
         }
+        // The history must include the run just appended, so milestone
+        // achievements (finish N runs, defeat N monsters) see this game.
+        try {
+            RunSummary summary = tracker.toSummary(record.seconds());
+            AchievementContext context = new AchievementContext(summary, runLog.readAll());
+            newlyUnlocked = AchievementService.newlyEarned(
+                    Achievements.all(), context, achievements.unlockedIds());
+            for (Achievement earned : newlyUnlocked) {
+                achievements.append(new UnlockedAchievement(earned.id(), record.endedAt()));
+            }
+        } catch (RuntimeException e) {
+            Gdx.app.error("scoundrel", "failed to evaluate achievements", e);
+            newlyUnlocked = List.of();
+        }
     }
 
     private void applyMove(Move move) {
         MoveResult result = engine.apply(state, move);
         state = result.state();
         recorder.observe(result);
+        tracker.observe(result);
         if (state.status() != Status.IN_PROGRESS) {
-            recordRun();
+            finishRun();
         }
         for (GameEvent event : result.events()) {
             String line = feedLine(event);
