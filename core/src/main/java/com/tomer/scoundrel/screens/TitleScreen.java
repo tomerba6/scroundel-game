@@ -47,7 +47,16 @@ public final class TitleScreen extends ScreenAdapter {
                 game.showRecords();
             }
         });
-        root.add(records).width(240);
+        root.add(records).width(240).padBottom(12);
+        root.row();
+        TextButton trophies = torchButton(theme, "Trophies");
+        trophies.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                game.showTrophies();
+            }
+        });
+        root.add(trophies).width(240);
         root.row();
         root.add(label("Scoundrel was designed by Zach Gage & Kurt Bieg — an unofficial fan implementation",
                 theme.small, dim(Theme.BONE, 0.4f))).padTop(72);

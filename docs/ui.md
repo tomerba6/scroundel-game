@@ -39,11 +39,12 @@ in sync with the code.
 - **Event log: fading feed.** The last few events float top-right and fade;
   no permanent log panel.
 - **Flow (revised 2026-07-07):** launch lands on a tiny **title screen** —
-  the navigation anchor every future menu (achievements, variants) hangs off:
-  New game / Records / a dim credit line. Win/loss dims the board under an
-  overlay with the score, best line, New game, and Records. **Records is
-  reachable only between games** (title + end overlay): a run, once started,
-  is uninterruptible — consistent with quit-outs being unrecorded.
+  the navigation anchor every future menu (variants) hangs off: New game /
+  Records / Trophies / a dim credit line. Win/loss dims the board under an
+  overlay with the score, best line, any freshly unlocked achievements, then
+  New game / Trophies / Records. **Records and Trophies are reachable only
+  between games** (title + end overlay): a run, once started, is
+  uninterruptible — consistent with quit-outs being unrecorded.
 - **Window:** resizable, 1280×720 default, Fit viewport (letterboxed scaling).
 - **Mood: torchlit dungeon** — dark, warm, quiet.
 
@@ -102,9 +103,10 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
   shudders the HP bar and flashes the number dried blood; healing glows the
   fill back in, herbal). No reveals or ambient effects yet.
 - **Navigation.** `ScoundrelGame` is the navigator: it owns the shared
-  `Theme` and `RunLog`, exposes `showTitle`/`showGame`/`showRecords`, and
-  disposes the outgoing screen on every switch. Screens are cheap and built
-  fresh each time; nothing is cached across switches.
+  `Theme`, `RunLog`, and `AchievementStore`, exposes
+  `showTitle`/`showGame`/`showRecords`/`showTrophies`, and disposes the
+  outgoing screen on every switch. Screens are cheap and built fresh each
+  time; nothing is cached across switches.
 - **Dumb view.** The screen calls only `newGame` / `legalMoves` / `apply`.
   Everything conditional (Avoid enabled, instant-play vs chooser, chooser
   contents) derives from `legalMoves`. Zero rule logic in screens — even
@@ -129,13 +131,17 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
 - **Events feed the feed; state feeds everything else.** `MoveResult.events`
   are consumed once for feed lines; persistent widgets render from state.
   `RoomDealt` and `GameWon/Lost` are filtered (board and overlay own those
-  facts). The feed is the first real consumer of the observer seam that
-  achievements/stats will use.
-- **Run recording.** `ScoundrelGame` builds a `RunLog` (`~/.scoundrel/runs.log`)
-  and hands it to the screen. Each game gets a `RunRecorder` seeded with the
-  shuffle seed; `applyMove` feeds it every `MoveResult`, and the finished run
-  is appended before the end overlay shows. A storage failure is logged and
-  never interrupts play.
+  facts). The feed shares the observer seam with the `runs` and `achievements`
+  layers — one event stream, consumed for different ends.
+- **Run recording and achievements.** `ScoundrelGame` builds a `RunLog`
+  (`~/.scoundrel/runs.log`) and an `AchievementStore`
+  (`~/.scoundrel/achievements.log`) and hands both to the screen. Each game
+  gets a `RunRecorder` and an `AchievementTracker`, both fed every
+  `MoveResult`. When the game ends, `finishRun` appends the run, then evaluates
+  the achievements newly earned (from the run summary plus history) and appends
+  each to the store; those fresh unlocks are listed on the end overlay. The two
+  storage steps are independently guarded — a failure in either is logged and
+  never interrupts play, nor stops the other.
 
 ## Components on screen
 
@@ -167,16 +173,26 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
 - **End overlay** — dim soot over the board; `DUNGEON CLEARED` (torchlight)
   or `DEFEATED` (dried blood), the score in display type, a best-score line
   (`New best!` in torchlight, or `best N` dimmed — from the persisted run
-  history), **New game** (reshuffles in place), and **Records**.
-- **Title screen** — `SCOUNDREL` in display type over soot, New game and
-  Records buttons, and a dim designer-credit line. Deliberately empty
-  otherwise; future menus join the button column.
+  history), any achievements just unlocked under a torchlight
+  `ACHIEVEMENT(S) UNLOCKED` heading (a hidden one is revealed the moment it is
+  earned), then **New game** (reshuffles in place), **Trophies**, and
+  **Records**.
+- **Title screen** — `SCOUNDREL` in display type over soot, New game,
+  Records, and Trophies buttons, and a dim designer-credit line. Deliberately
+  empty otherwise; future menus join the button column.
 - **THE LEDGER (records screen)** — the top 10 runs as a dungeon ledger:
   Roman-numeral ranks in torchlight, scores in IM Fell (dried blood when
   negative), outcome, date, duration, monsters slain, hairline rules between
   rows. Beside it, lifetime totals headed `ACROSS N FINISHED RUNS` (the
   label encodes the quit-runs decision: finished games are the whole
   universe). Empty state invites a first run; Back returns to the title.
+- **TROPHIES (achievements screen)** — the whole catalog as a book of deeds,
+  headed by an `N of 10 earned` count. One hairline-ruled row per achievement:
+  title (torchlight when earned, dim when locked), the deed described, and the
+  date won or `locked`. Locked-but-visible trophies show what to aim for; a
+  hidden trophy stays `???` until earned, then reveals its real title and text.
+  Read once from the `AchievementStore` on entry, guarded; Back returns to the
+  title.
 
 ## Files
 
@@ -187,7 +203,8 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
 - `core/src/main/java/com/tomer/scoundrel/screens/Choreographer.java` — the
   flight layer: deal-in and avoid-sweep choreographies, input gate, skip.
 - `core/src/main/java/com/tomer/scoundrel/screens/TitleScreen.java` /
-  `RecordsScreen.java` — the navigation anchor and THE LEDGER.
+  `RecordsScreen.java` / `TrophiesScreen.java` — the navigation anchor, THE
+  LEDGER, and the achievement catalog.
 - `core/src/main/java/com/tomer/scoundrel/screens/CardTiles.java` /
   `Widgets.java` — shared tile, label and button builders, plus
   `pressListener` (the press-not-click input rule) and
@@ -196,7 +213,8 @@ and tinted at use; feed copy writes names out ("the Queen of clubs").
   `CardHitRegions.java` — the pure, headlessly-tested parts of the motion and
   skip-and-act logic.
 - `core/src/main/java/com/tomer/scoundrel/ScoundrelGame.java` — the navigator:
-  creates the Theme and RunLog, boots into `TitleScreen`, owns disposal.
+  creates the Theme, RunLog and AchievementStore, boots into `TitleScreen`,
+  owns disposal.
 - `lwjgl3` launcher — 1280×720 window, title "Scoundrel".
 - `assets/fonts/` — the two typefaces plus OFL license texts.
 

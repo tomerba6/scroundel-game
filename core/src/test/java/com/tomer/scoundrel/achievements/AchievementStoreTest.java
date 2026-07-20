@@ -1,0 +1,82 @@
+package com.tomer.scoundrel.achievements;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class AchievementStoreTest {
+
+    @TempDir
+    Path dir;
+
+    private static UnlockedAchievement unlock(String id, String earnedAt) {
+        return new UnlockedAchievement(id, Instant.parse(earnedAt));
+    }
+
+    @Test
+    void appendCreatesMissingDirectoriesAndFile() {
+        Path file = dir.resolve("nested").resolve("achievements.log");
+        AchievementStore store = new AchievementStore(file);
+        UnlockedAchievement earned = unlock("first_blood", "2026-07-10T10:00:00Z");
+        store.append(earned);
+        assertTrue(Files.exists(file));
+        assertEquals(List.of(earned), store.readAll());
+    }
+
+    @Test
+    void appendsAccumulateInOrder() {
+        AchievementStore store = new AchievementStore(dir.resolve("achievements.log"));
+        UnlockedAchievement first = unlock("first_blood", "2026-07-10T10:00:00Z");
+        UnlockedAchievement second = unlock("giant_slayer", "2026-07-10T10:05:00Z");
+        store.append(first);
+        store.append(second);
+        assertEquals(List.of(first, second), store.readAll());
+        assertEquals(Set.of("first_blood", "giant_slayer"), store.unlockedIds());
+    }
+
+    @Test
+    void readingWithoutAFileIsEmpty() {
+        AchievementStore store = new AchievementStore(dir.resolve("never-written.log"));
+        assertEquals(List.of(), store.readAll());
+        assertEquals(Set.of(), store.unlockedIds());
+    }
+
+    @Test
+    void aRepeatedIdIsDedupedKeepingTheEarliestEarn() {
+        AchievementStore store = new AchievementStore(dir.resolve("achievements.log"));
+        UnlockedAchievement earliest = unlock("seasoned", "2026-07-10T10:00:00Z");
+        store.append(earliest);
+        store.append(unlock("seasoned", "2026-07-11T10:00:00Z"));
+        assertEquals(List.of(earliest), store.readAll());
+        assertEquals(Set.of("seasoned"), store.unlockedIds());
+    }
+
+    @Test
+    void corruptLinesAreSkippedNotFatal() throws Exception {
+        Path file = dir.resolve("achievements.log");
+        UnlockedAchievement good = unlock("first_blood", "2026-07-10T10:00:00Z");
+        UnlockedAchievement alsoGood = unlock("speedrunner", "2026-07-10T10:01:00Z");
+        Files.writeString(file, good.toLine() + "\n### corrupted ###\nv=9\tfuture=stuff\n"
+                + alsoGood.toLine() + "\n");
+        assertEquals(List.of(good, alsoGood), new AchievementStore(file).readAll());
+    }
+
+    @Test
+    void unwritableLocationThrowsUncheckedIOExceptionForTheCallerToHandle() throws Exception {
+        Path blocker = dir.resolve("blocker");
+        Files.createFile(blocker);
+        AchievementStore store = new AchievementStore(blocker.resolve("achievements.log"));
+        assertThrows(UncheckedIOException.class,
+                () -> store.append(unlock("first_blood", "2026-07-10T10:00:00Z")));
+    }
+}
