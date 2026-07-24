@@ -100,4 +100,16 @@ class AchievementStoreTest {
         store.clear();
         assertEquals(List.of(), store.readAll());
     }
+
+    @Test
+    void clearOverwritesAnyPriorBackup() {
+        AchievementStore store = new AchievementStore(dir.resolve("achievements.log"));
+        store.append(unlock("first_blood", "2026-07-10T10:00:00Z"));
+        store.clear();
+        UnlockedAchievement later = unlock("speedrunner", "2026-07-11T10:00:00Z");
+        store.append(later);
+        store.clear();
+        assertEquals(List.of(later),
+                new AchievementStore(dir.resolve("achievements.log.bak")).readAll());
+    }
 }

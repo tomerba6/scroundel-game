@@ -67,6 +67,11 @@ public final class AchievementTracker {
         if (avoided) {
             resetRoom(); // scooping a room never counts as clearing it unscathed
         } else if (turnEnded) {
+            // "A whole room" means a full turn's worth of resolutions taken without a
+            // scratch. The endgame's final short room (the standard deck always ends in
+            // a 2-card room) resolves fewer than cardsPerFullRoom and so deliberately
+            // never qualifies — Flawless Room is earned on an earlier full room instead.
+            // Once set the flag latches: a later damaged room never clears it.
             if (roomDamage == 0 && roomMonstersDefeated >= 1 && roomCardsResolved >= cardsPerFullRoom) {
                 flawlessRoom = true;
             }
