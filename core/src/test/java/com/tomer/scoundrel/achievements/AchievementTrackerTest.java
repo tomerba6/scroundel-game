@@ -98,6 +98,57 @@ class AchievementTrackerTest {
     }
 
     @Test
+    void aScratchlessFinalPartialRoomDoesNotCount() {
+        // The standard game ends in a 2-card room; clearing it without a scratch
+        // resolves fewer than a full room, so Flawless Room deliberately stays out.
+        AchievementTracker tracker = new AchievementTracker(FULL_ROOM);
+        tracker.observe(result(20, new GameEvent.MonsterDefeated(monster("2C", 2), true, 0)));
+        tracker.observe(result(20,
+                new GameEvent.MonsterDefeated(monster("2S", 2), true, 0),
+                new GameEvent.GameWon(20)));
+
+        assertFalse(tracker.toSummary(50).flawlessRoom());
+    }
+
+    @Test
+    void aFlawlessRoomAfterADamagedOneIsStillDetected() {
+        AchievementTracker tracker = new AchievementTracker(FULL_ROOM);
+        // Room one: a scratch is taken.
+        tracker.observe(result(14, new GameEvent.MonsterDefeated(monster("6C", 6), false, 6)));
+        tracker.observe(result(14, new GameEvent.WeaponEquipped(weapon(10))));
+        tracker.observe(result(14,
+                new GameEvent.PotionUsed(potion(3), 0),
+                new GameEvent.RoomDealt(List.of())));
+        // Room two: a full, scratchless room — detection is not limited to the first room.
+        tracker.observe(result(14, new GameEvent.MonsterDefeated(monster("5C", 5), true, 0)));
+        tracker.observe(result(14, new GameEvent.WeaponEquipped(weapon(9))));
+        tracker.observe(result(14,
+                new GameEvent.MonsterDefeated(monster("4C", 4), true, 0),
+                new GameEvent.GameWon(14)));
+
+        assertTrue(tracker.toSummary(80).flawlessRoom());
+    }
+
+    @Test
+    void aFlawlessRoomEarnedBeforeDyingStillCounts() {
+        AchievementTracker tracker = new AchievementTracker(FULL_ROOM);
+        // A full, scratchless room latches the flag...
+        tracker.observe(result(20, new GameEvent.MonsterDefeated(monster("5C", 5), true, 0)));
+        tracker.observe(result(20, new GameEvent.WeaponEquipped(weapon(10))));
+        tracker.observe(result(20,
+                new GameEvent.MonsterDefeated(monster("4C", 4), true, 0),
+                new GameEvent.RoomDealt(List.of())));
+        // ...then a later room is fatal; the latch must survive into the loss.
+        tracker.observe(result(0,
+                new GameEvent.MonsterDefeated(monster("KC", 13), false, 13),
+                new GameEvent.GameLost(-40)));
+
+        RunSummary summary = tracker.toSummary(70);
+        assertTrue(summary.flawlessRoom());
+        assertEquals(Status.LOST, summary.outcome());
+    }
+
+    @Test
     void aDamagelessRoomWithNoMonsterDoesNotCount() {
         AchievementTracker tracker = new AchievementTracker(FULL_ROOM);
         tracker.observe(result(20, new GameEvent.WeaponEquipped(weapon(5))));

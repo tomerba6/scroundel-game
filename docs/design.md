@@ -270,6 +270,7 @@ The design opens exactly the seams the named future features require, and no mor
 4. **Weapon degradation** uses strict `<` (a monster of equal value must be fought barehanded); a weapon that can't be used on a given monster stays equipped for weaker ones and is never discarded by degradation.
 5. **Partial rooms:** when the dungeon runs low, rooms fill with whatever remains and there is no carryover; all remaining cards are resolved, and clearing them with health > 0 is the win. **Turn boundaries at the end:** a turn ends after `cardsResolvedPerTurn` resolutions *or when the room empties* — so a room that starts partial is one turn (one potion allowance; the standard deck's arithmetic makes every completed game end in a 2-card room), while the lone carryover left after a full room is still its own next room/turn.
 6. **Avoiding requires a non-empty dungeon.** With an empty dungeon (partial room, or a full room dealt from the last cards), avoiding would re-deal the exact same cards — a guaranteed no-op — so it is illegal. Equivalently: every legal avoid actually changes the room.
+7. **Flawless Room** counts only a *full* room — a turn with `cardsResolvedPerTurn` resolutions taken without damage and at least one monster slain. The endgame's final 2-card room (see 5) resolves fewer cards and so never qualifies; the achievement is earned on an earlier full room. Once earned in a run the flag latches — a later damaged room never clears it.
 
 ### Deferred seams and tradeoffs
 
