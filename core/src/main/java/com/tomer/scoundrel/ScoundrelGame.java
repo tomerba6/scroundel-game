@@ -51,11 +51,11 @@ public class ScoundrelGame extends Game {
     /**
      * Wipes all recorded runs and earned achievements. Both files are moved
      * aside to recoverable {@code .bak} backups rather than deleted. Guarded in
-     * the UI behind a confirmation; callers own that safety step.
+     * the UI behind a confirmation; callers own that safety step. The wipe itself
+     * is the pure {@link Progress#eraseAll} so it can be tested headlessly.
      */
     public void eraseAllProgress() {
-        runLog.clear();
-        achievements.clear();
+        Progress.eraseAll(runLog, achievements);
     }
 
     /** setScreen only hides the previous screen; it must also be disposed. */
